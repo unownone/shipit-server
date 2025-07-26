@@ -1,0 +1,122 @@
+basePath: /api/v1
+definitions:
+  handlers.RegisterRequest:
+    properties:
+      email:
+        type: string
+      name:
+        minLength: 2
+        type: string
+      password:
+        minLength: 8
+        type: string
+    required:
+    - email
+    - name
+    - password
+    type: object
+  handlers.ValidateTokenRequest:
+    properties:
+      token:
+        type: string
+    required:
+    - token
+    type: object
+  handlers.ValidateTokenResponse:
+    properties:
+      auth_type:
+        description: '"api_key" or "jwt"'
+        type: string
+      error:
+        type: string
+      user_id:
+        type: string
+      valid:
+        type: boolean
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@shipit.com
+    name: ShipIt Support
+    url: http://www.shipit.com/support
+  description: A tunnel service for exposing local services to the internet
+  license:
+    name: MIT
+    url: http://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: ShipIt Server API
+  version: 1.0.0
+paths:
+  /auth/validate:
+    post:
+      consumes:
+      - application/json
+      description: Validates both API keys and JWT tokens
+      parameters:
+      - description: Token validation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ValidateTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ValidateTokenResponse'
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Validate authentication token
+      tags:
+      - authentication
+  /users/register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user account
+      parameters:
+      - description: User registration data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: User created successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request data
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: User already exists
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Register a new user
+      tags:
+      - authentication
+securityDefinitions:
+  ApiKeyAuth:
+    description: API key authentication. Use "Bearer {api_key}" format.
+    in: header
+    name: Authorization
+    type: apiKey
+  BearerAuth:
+    description: JWT token authentication. Use "Bearer {jwt_token}" format.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

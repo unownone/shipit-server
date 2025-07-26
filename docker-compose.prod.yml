@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: shipit-postgres-prod
+    environment:
+      POSTGRES_DB: ${SHIPIT_DATABASE_NAME:-shipit}
+      POSTGRES_USER: ${SHIPIT_DATABASE_USER:-shipit_user}
+      POSTGRES_PASSWORD: ${SHIPIT_SECRET_DATABASE_PASSWORD}
+      POSTGRES_HOST_AUTH_METHOD: md5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SHIPIT_DATABASE_USER:-shipit_user} -d ${SHIPIT_DATABASE_NAME:-shipit}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - shipit-network
+    restart: unless-stopped
+    # Production security: don't expose port to host
+    # ports:
+    #   - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: shipit-redis-prod
+    command: redis-server ${SHIPIT_REDIS_PASSWORD:+--requirepass "$SHIPIT_REDIS_PASSWORD"}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: 
+        - CMD
+        - redis-cli
+        - ${SHIPIT_REDIS_PASSWORD:+-a}
+        - ${SHIPIT_REDIS_PASSWORD:-}
+        - ping
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - shipit-network
+    restart: unless-stopped
+    # Production security: don't expose port to host
+    # ports:
+    #   - "6379:6379"
+
+  shipit-server:
+    build: .
+    container_name: shipit-server-prod
+    env_file:
+      - .env
+    environment:
+      # Override for Docker networking and production settings
+      SHIPIT_SERVER_ENVIRONMENT: production
+      SHIPIT_DATABASE_HOST: postgres
+      SHIPIT_REDIS_HOST: redis
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    volumes:
+      - ./configs/production.yaml:/app/configs/server.yaml:ro
+      # For TLS certificates in production
+      - /etc/ssl/certs:/etc/ssl/certs:ro
+      - /etc/ssl/private:/etc/ssl/private:ro
+    networks:
+      - shipit-network
+    restart: unless-stopped
+    # Production security settings
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    user: "1000:1000"
+
+
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  shipit-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16 

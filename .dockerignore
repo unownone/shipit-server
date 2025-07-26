@@ -1,0 +1,34 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+docs/
+
+# Development files
+Makefile
+.vscode/
+.idea/
+
+# Secrets (they are mounted as volumes)
+secrets/
+
+# Build artifacts
+bin/
+coverage.out
+coverage.html
+
+# Test files
+*_test.go
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/ 

@@ -1,0 +1,73 @@
+server:
+  domain: "yourdomain.com"
+  http_port: 8080
+  https_port: 8443
+  agent_port: 7223
+  environment: "production"
+  
+tls:
+  cert_file: "/etc/ssl/certs/shipit.crt"
+  key_file: "/etc/ssl/private/shipit.key"
+  auto_cert: true  # Let's Encrypt
+
+auth:
+  api_key_length: 32
+  hash_cost: 14    # Higher cost for production
+  max_login_attempts: 3
+  lockout_duration: "30m"
+
+jwt:
+  secret_key: ""  # Will be loaded from secrets
+  issuer: "shipit-server"
+  audience: "shipit-users"
+  access_token_expiry: "15m"  # Shorter for production
+  refresh_token_expiry: "168h"  # 7 days
+  algorithm: "HS256"
+
+database:
+  driver: "postgres"
+  host: "postgres"
+  port: 5432
+  name: "shipit"
+  user: "shipit_user"
+  password: ""  # Will be loaded from secrets
+  ssl_mode: "require"  # Require SSL in production
+  max_connections: 50
+  max_idle_connections: 10
+  connection_max_lifetime: "10m"
+
+redis:
+  host: "redis"
+  port: 6379
+  password: ""
+  db: 0
+  max_retries: 5
+  pool_size: 20
+
+tunnels:
+  max_per_user: 5  # Lower limit for production
+  connection_pool_size: 10
+  subdomain_length: 8
+  default_ttl: "12h"  # Shorter TTL for production
+
+analytics:
+  enabled: true
+  retention_days: 30
+  metrics_endpoint: "/metrics"
+
+cors:
+  allowed_origins: ["https://yourdomain.com", "https://app.yourdomain.com"]
+  allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+  allowed_headers: ["Authorization", "Content-Type", "X-Requested-With"]
+  allow_credentials: true
+
+rate_limiting:
+  enabled: true
+  api_requests_per_minute: 30
+  login_attempts_per_hour: 3
+  tunnel_creation_per_hour: 5
+
+logging:
+  level: "info"
+  format: "json"
+  output: "stdout" 

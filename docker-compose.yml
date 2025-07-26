@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: shipit-postgres
+    environment:
+      POSTGRES_DB: ${SHIPIT_DATABASE_NAME:-shipit}
+      POSTGRES_USER: ${SHIPIT_DATABASE_USER:-shipit_user}
+      POSTGRES_PASSWORD: ${SHIPIT_SECRET_DATABASE_PASSWORD:-shipit_dev_password}
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "${SHIPIT_DATABASE_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SHIPIT_DATABASE_USER:-shipit_user} -d ${SHIPIT_DATABASE_NAME:-shipit}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shipit-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: shipit-redis
+    command: redis-server ${SHIPIT_REDIS_PASSWORD:+--requirepass "$SHIPIT_REDIS_PASSWORD"}
+    ports:
+      - "${SHIPIT_REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: 
+        - CMD
+        - redis-cli
+        - ${SHIPIT_REDIS_PASSWORD:+-a}
+        - ${SHIPIT_REDIS_PASSWORD:-}
+        - ping
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - shipit-network
+
+  shipit-server:
+    build: .
+    container_name: shipit-server
+    env_file:
+      - .env
+    environment:
+      # Override for Docker networking
+      SHIPIT_DATABASE_HOST: postgres
+      SHIPIT_REDIS_HOST: redis
+    ports:
+      - "${SHIPIT_SERVER_HTTP_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      - ./configs:/app/configs:ro
+    networks:
+      - shipit-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  shipit-network:
+    driver: bridge 
