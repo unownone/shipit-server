@@ -1,4 +1,4 @@
-version: "1"
+version: "2"
 
 run: 
   timeout: 5m
@@ -31,8 +31,6 @@ linters-settings:
   gosec:
     excludes:
       - G404 # Use of weak random number generator
-  govet:
-    check-shadowing: true
   revive:
     rules:
       - name: exported
