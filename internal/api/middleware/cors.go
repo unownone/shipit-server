@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/unwonone/shipit-server/internal/config"
+	"github.com/unownone/shipit-server/internal/config"
 )
 
 // CORSMiddleware creates a CORS middleware with the given configuration

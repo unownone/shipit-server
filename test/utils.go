@@ -19,12 +19,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
-	"github.com/unwonone/shipit-server/internal/api"
-	"github.com/unwonone/shipit-server/internal/auth"
-	"github.com/unwonone/shipit-server/internal/config"
-	"github.com/unwonone/shipit-server/internal/database"
-	"github.com/unwonone/shipit-server/internal/database/sqlc"
-	"github.com/unwonone/shipit-server/internal/logger"
+	"github.com/unownone/shipit-server/internal/api"
+	"github.com/unownone/shipit-server/internal/auth"
+	"github.com/unownone/shipit-server/internal/config"
+	"github.com/unownone/shipit-server/internal/database"
+	"github.com/unownone/shipit-server/internal/database/sqlc"
+	"github.com/unownone/shipit-server/internal/logger"
 )
 
 // testSuite provides shared test infrastructure with testcontainers

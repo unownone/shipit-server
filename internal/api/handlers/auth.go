@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/unwonone/shipit-server/internal/auth"
+	"github.com/unownone/shipit-server/internal/auth"
 )
 
 // AuthHandler handles authentication-related API endpoints

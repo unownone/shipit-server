@@ -2,7 +2,7 @@
 <!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">
 <coverage line-rate="0.54593176" branch-rate="0" lines-covered="832" lines-valid="1524" branches-covered="0" branches-valid="0" complexity="0" version="" timestamp="1753797773967">
 	<packages>
-		<package name="github.com/unwonone/shipit-server/internal/api" line-rate="0.8979592" branch-rate="0" complexity="0" line-count="49" line-hits="44">
+		<package name="github.com/unownone/shipit-server/internal/api" line-rate="0.8979592" branch-rate="0" complexity="0" line-count="49" line-hits="44">
 			<classes>
 				<class name="-" filename="internal/api/routes.go" line-rate="0.8979592" branch-rate="0" complexity="0" line-count="49" line-hits="44">
 					<methods>
@@ -130,7 +130,7 @@
 				</class>
 			</classes>
 		</package>
-		<package name="github.com/unwonone/shipit-server/internal/api/handlers" line-rate="0.73978496" branch-rate="0" complexity="0" line-count="465" line-hits="344">
+		<package name="github.com/unownone/shipit-server/internal/api/handlers" line-rate="0.73978496" branch-rate="0" complexity="0" line-count="465" line-hits="344">
 			<classes>
 				<class name="-" filename="internal/api/handlers/analytics.go" line-rate="0.9" branch-rate="0" complexity="0" line-count="10" line-hits="9">
 					<methods>
@@ -1242,7 +1242,7 @@
 				</class>
 			</classes>
 		</package>
-		<package name="github.com/unwonone/shipit-server/internal/api/middleware" line-rate="0.52666664" branch-rate="0" complexity="0" line-count="150" line-hits="79">
+		<package name="github.com/unownone/shipit-server/internal/api/middleware" line-rate="0.52666664" branch-rate="0" complexity="0" line-count="150" line-hits="79">
 			<classes>
 				<class name="-" filename="internal/api/middleware/auth.go" line-rate="0.42477876" branch-rate="0" complexity="0" line-count="113" line-hits="48">
 					<methods>
@@ -1648,7 +1648,7 @@
 				</class>
 			</classes>
 		</package>
-		<package name="github.com/unwonone/shipit-server/internal/auth" line-rate="0.71511626" branch-rate="0" complexity="0" line-count="172" line-hits="123">
+		<package name="github.com/unownone/shipit-server/internal/auth" line-rate="0.71511626" branch-rate="0" complexity="0" line-count="172" line-hits="123">
 			<classes>
 				<class name="-" filename="internal/auth/apikeys.go" line-rate="1" branch-rate="0" complexity="0" line-count="1" line-hits="1">
 					<methods>
@@ -2132,7 +2132,7 @@
 				</class>
 			</classes>
 		</package>
-		<package name="github.com/unwonone/shipit-server/internal/config" line-rate="0.0061728396" branch-rate="0" complexity="0" line-count="162" line-hits="1">
+		<package name="github.com/unownone/shipit-server/internal/config" line-rate="0.0061728396" branch-rate="0" complexity="0" line-count="162" line-hits="1">
 			<classes>
 				<class name="-" filename="internal/config/config.go" line-rate="0" branch-rate="0" complexity="0" line-count="69" line-hits="0">
 					<methods>
@@ -2554,7 +2554,7 @@
 				</class>
 			</classes>
 		</package>
-		<package name="github.com/unwonone/shipit-server/internal/database" line-rate="0.34545454" branch-rate="0" complexity="0" line-count="55" line-hits="19">
+		<package name="github.com/unownone/shipit-server/internal/database" line-rate="0.34545454" branch-rate="0" complexity="0" line-count="55" line-hits="19">
 			<classes>
 				<class name="-" filename="internal/database/db.go" line-rate="0.7894737" branch-rate="0" complexity="0" line-count="19" line-hits="15">
 					<methods>
@@ -2712,7 +2712,7 @@
 				</class>
 			</classes>
 		</package>
-		<package name="github.com/unwonone/shipit-server/internal/database/sqlc" line-rate="0.31958762" branch-rate="0" complexity="0" line-count="291" line-hits="93">
+		<package name="github.com/unownone/shipit-server/internal/database/sqlc" line-rate="0.31958762" branch-rate="0" complexity="0" line-count="291" line-hits="93">
 			<classes>
 				<class name="Queries" filename="internal/database/sqlc/analytics.sql.go" line-rate="0.06349207" branch-rate="0" complexity="0" line-count="63" line-hits="4">
 					<methods>
@@ -3612,7 +3612,7 @@
 				</class>
 			</classes>
 		</package>
-		<package name="github.com/unwonone/shipit-server/internal/logger" line-rate="0.5652174" branch-rate="0" complexity="0" line-count="23" line-hits="13">
+		<package name="github.com/unownone/shipit-server/internal/logger" line-rate="0.5652174" branch-rate="0" complexity="0" line-count="23" line-hits="13">
 			<classes>
 				<class name="-" filename="internal/logger/logger.go" line-rate="0.5652174" branch-rate="0" complexity="0" line-count="23" line-hits="13">
 					<methods>
@@ -3708,7 +3708,7 @@
 				</class>
 			</classes>
 		</package>
-		<package name="github.com/unwonone/shipit-server/test" line-rate="0.7388535" branch-rate="0" complexity="0" line-count="157" line-hits="116">
+		<package name="github.com/unownone/shipit-server/test" line-rate="0.7388535" branch-rate="0" complexity="0" line-count="157" line-hits="116">
 			<classes>
 				<class name="-" filename="test/utils.go" line-rate="0.71" branch-rate="0" complexity="0" line-count="100" line-hits="71">
 					<methods>

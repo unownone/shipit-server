@@ -13,13 +13,13 @@ import (
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	_ "github.com/unwonone/shipit-server/docs" // Import generated docs
-	"github.com/unwonone/shipit-server/internal/api"
-	"github.com/unwonone/shipit-server/internal/auth"
-	"github.com/unwonone/shipit-server/internal/config"
-	"github.com/unwonone/shipit-server/internal/database"
-	"github.com/unwonone/shipit-server/internal/database/sqlc"
-	"github.com/unwonone/shipit-server/internal/logger"
+	_ "github.com/unownone/shipit-server/docs" // Import generated docs
+	"github.com/unownone/shipit-server/internal/api"
+	"github.com/unownone/shipit-server/internal/auth"
+	"github.com/unownone/shipit-server/internal/config"
+	"github.com/unownone/shipit-server/internal/database"
+	"github.com/unownone/shipit-server/internal/database/sqlc"
+	"github.com/unownone/shipit-server/internal/logger"
 )
 
 // @title           ShipIt Server API

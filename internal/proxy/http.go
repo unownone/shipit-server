@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/unwonone/shipit-server/internal/config"
-	"github.com/unwonone/shipit-server/internal/logger"
-	"github.com/unwonone/shipit-server/internal/tunnel"
+	"github.com/unownone/shipit-server/internal/config"
+	"github.com/unownone/shipit-server/internal/logger"
+	"github.com/unownone/shipit-server/internal/tunnel"
 )
 
 // HTTPProxy handles HTTP/HTTPS traffic routing to tunnels

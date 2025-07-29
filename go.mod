@@ -1,4 +1,4 @@
-module github.com/unwonone/shipit-server
+module github.com/unownone/shipit-server
 
 go 1.24.2
 

@@ -3,11 +3,11 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/unwonone/shipit-server/internal/api/handlers"
-	"github.com/unwonone/shipit-server/internal/api/middleware"
-	"github.com/unwonone/shipit-server/internal/auth"
-	"github.com/unwonone/shipit-server/internal/config"
-	"github.com/unwonone/shipit-server/internal/database"
+	"github.com/unownone/shipit-server/internal/api/handlers"
+	"github.com/unownone/shipit-server/internal/api/middleware"
+	"github.com/unownone/shipit-server/internal/auth"
+	"github.com/unownone/shipit-server/internal/config"
+	"github.com/unownone/shipit-server/internal/database"
 )
 
 // SetupRoutes configures all API routes
