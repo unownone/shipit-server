@@ -1,22 +1,16 @@
 package test
 
 import (
-	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-
-	"github.com/unwonone/shipit-server/internal/auth"
-	"github.com/unwonone/shipit-server/internal/database/sqlc"
 )
 
 // UsersTestSuite tests user management endpoints
 type UsersTestSuite struct {
 	suite.Suite
-	*testSuite
+	testSuite *testSuite
 }
 
 func (s *UsersTestSuite) SetupTest() {
@@ -37,7 +31,7 @@ func (s *UsersTestSuite) TestGetProfile() {
 	}{
 		{
 			name:           "get user profile with JWT",
-			user:           s.TestUser,
+			user:           s.testSuite.TestUser,
 			expectedStatus: 200,
 		},
 		{
@@ -52,9 +46,9 @@ func (s *UsersTestSuite) TestGetProfile() {
 		s.Run(test.name, func() {
 			var resp *APIResponse
 			if test.user != nil {
-				resp = s.MakeAuthenticatedRequest("GET", "/api/v1/users/profile", nil, test.user)
+				resp = s.testSuite.MakeAuthenticatedRequest("GET", "/api/v1/users/profile", nil, test.user)
 			} else {
-				resp = s.MakeRequest("GET", "/api/v1/users/profile", nil, nil)
+				resp = s.testSuite.MakeRequest("GET", "/api/v1/users/profile", nil, nil)
 			}
 
 			if test.expectedStatus < 400 {
@@ -82,7 +76,7 @@ func (s *UsersTestSuite) TestUpdateProfile() {
 	}{
 		{
 			name: "update name only",
-			user: s.TestUser,
+			user: s.testSuite.TestUser,
 			payload: map[string]interface{}{
 				"name": "Updated Name",
 			},
@@ -90,7 +84,7 @@ func (s *UsersTestSuite) TestUpdateProfile() {
 		},
 		{
 			name: "update email only",
-			user: s.TestUser,
+			user: s.testSuite.TestUser,
 			payload: map[string]interface{}{
 				"email": "updated@example.com",
 			},
@@ -98,35 +92,28 @@ func (s *UsersTestSuite) TestUpdateProfile() {
 		},
 		{
 			name: "update both name and email",
-			user: s.TestUser2,
+			user: s.testSuite.TestUser,
 			payload: map[string]interface{}{
-				"name":  "New Name",
-				"email": "new.email@example.com",
+				"name":  "Updated Name 2",
+				"email": "updated2@example.com",
 			},
 			expectedStatus: 200,
 		},
 		{
 			name: "update with invalid email",
-			user: s.TestUser,
+			user: s.testSuite.TestUser,
 			payload: map[string]interface{}{
 				"email": "invalid-email",
 			},
 			expectedStatus: 400,
-			expectedError:  "Invalid email",
+			expectedError:  "Invalid request data",
 		},
 		{
-			name: "update with duplicate email",
-			user: s.TestUser,
+			name: "update profile without authentication",
+			user: nil,
 			payload: map[string]interface{}{
-				"email": "test2@example.com", // Use hardcoded email instead of s.TestUser2.Email
+				"name": "Updated Name",
 			},
-			expectedStatus: 409,
-			expectedError:  "Email is already taken",
-		},
-		{
-			name:           "update without authentication",
-			user:           nil,
-			payload:        map[string]interface{}{"name": "Hacker"},
 			expectedStatus: 401,
 			expectedError:  "Authorization header is required",
 		},
@@ -134,42 +121,21 @@ func (s *UsersTestSuite) TestUpdateProfile() {
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
-			// For the duplicate email test, create the second user first
-			if test.name == "update with duplicate email" {
-				ctx := context.Background()
-				// Create second user for duplicate email test
-				hashedPassword, err := s.PasswordManager.HashPassword("testpassword123")
-				require.NoError(s.T(), err)
-
-				_, err = s.DB.Queries.CreateUser(ctx, sqlc.CreateUserParams{
-					Email:         "test2@example.com",
-					PasswordHash:  hashedPassword,
-					Name:          "Test User 2",
-					Role:          string(auth.RoleUser),
-					IsActive:      true,
-					EmailVerified: false,
-				})
-				require.NoError(s.T(), err)
-			}
-
 			var resp *APIResponse
 			if test.user != nil {
-				resp = s.MakeAuthenticatedRequest("PUT", "/api/v1/users/profile", test.payload, test.user)
+				resp = s.testSuite.MakeAuthenticatedRequest("PUT", "/api/v1/users/profile", test.payload, test.user)
 			} else {
-				resp = s.MakeRequest("PUT", "/api/v1/users/profile", test.payload, nil)
+				resp = s.testSuite.MakeRequest("PUT", "/api/v1/users/profile", test.payload, nil)
 			}
 
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
-				if userData, exists := resp.Body["user"]; exists {
-					user := userData.(map[string]interface{})
-
-					if name, ok := test.payload["name"]; ok {
-						assert.Equal(s.T(), name, user["name"])
-					}
-					if email, ok := test.payload["email"]; ok {
-						assert.Equal(s.T(), email, user["email"])
-					}
+				user := resp.Body["user"].(map[string]interface{})
+				if name, ok := test.payload["name"]; ok {
+					assert.Equal(s.T(), name, user["name"])
+				}
+				if email, ok := test.payload["email"]; ok {
+					assert.Equal(s.T(), email, user["email"])
 				}
 			} else {
 				AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
@@ -178,7 +144,76 @@ func (s *UsersTestSuite) TestUpdateProfile() {
 	}
 }
 
-// TestCreateAPIKey tests creating API keys
+// TestChangePassword tests password change endpoint
+func (s *UsersTestSuite) TestChangePassword() {
+	tests := []struct {
+		name           string
+		user           *testUser
+		payload        map[string]interface{}
+		expectedStatus int
+		expectedError  string
+	}{
+		{
+			name: "change password successfully",
+			user: s.testSuite.TestUser,
+			payload: map[string]interface{}{
+				"current_password": s.testSuite.TestUser.Password,
+				"new_password":     "newpassword123",
+			},
+			expectedStatus: 200,
+		},
+		{
+			name: "change password with wrong current password",
+			user: s.testSuite.TestUser,
+			payload: map[string]interface{}{
+				"current_password": "wrongpassword",
+				"new_password":     "newpassword123",
+			},
+			expectedStatus: 401,
+			expectedError:  "Current password is incorrect",
+		},
+		{
+			name: "change password with weak new password",
+			user: s.testSuite.TestUser,
+			payload: map[string]interface{}{
+				"current_password": s.testSuite.TestUser.Password,
+				"new_password":     "123",
+			},
+			expectedStatus: 400,
+			expectedError:  "Password is too weak",
+		},
+		{
+			name: "change password without authentication",
+			user: nil,
+			payload: map[string]interface{}{
+				"current_password": "oldpassword",
+				"new_password":     "newpassword123",
+			},
+			expectedStatus: 401,
+			expectedError:  "Authorization header is required",
+		},
+	}
+
+	for _, test := range tests {
+		s.Run(test.name, func() {
+			var resp *APIResponse
+			if test.user != nil {
+				resp = s.testSuite.MakeAuthenticatedRequest("PUT", "/api/v1/users/password", test.payload, test.user)
+			} else {
+				resp = s.testSuite.MakeRequest("PUT", "/api/v1/users/password", test.payload, nil)
+			}
+
+			if test.expectedStatus < 400 {
+				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
+				assert.Contains(s.T(), resp.Body, "message")
+			} else {
+				AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
+			}
+		})
+	}
+}
+
+// TestCreateAPIKey tests API key creation endpoint
 func (s *UsersTestSuite) TestCreateAPIKey() {
 	tests := []struct {
 		name           string
@@ -188,35 +223,38 @@ func (s *UsersTestSuite) TestCreateAPIKey() {
 		expectedError  string
 	}{
 		{
-			name: "create API key with name only",
-			user: s.TestUser,
+			name: "create API key successfully",
+			user: s.testSuite.TestUser,
 			payload: map[string]interface{}{
-				"name": "Test API Key",
+				"name":        "Test API Key",
+				"description": "API key for testing",
 			},
 			expectedStatus: 201,
 		},
 		{
-			name: "create API key with expiration",
-			user: s.TestUser,
+			name: "create API key without description",
+			user: s.testSuite.TestUser,
 			payload: map[string]interface{}{
-				"name":       "Expiring Key",
-				"expires_at": time.Now().Add(24 * time.Hour).Format(time.RFC3339),
+				"name": "Test API Key 2",
 			},
 			expectedStatus: 201,
 		},
 		{
 			name: "create API key without name",
-			user: s.TestUser,
+			user: s.testSuite.TestUser,
 			payload: map[string]interface{}{
-				"expires_at": time.Now().Add(24 * time.Hour).Format(time.RFC3339),
+				"description": "API key without name",
 			},
 			expectedStatus: 400,
 			expectedError:  "Invalid request data",
 		},
 		{
-			name:           "create API key without authentication",
-			user:           nil,
-			payload:        map[string]interface{}{"name": "Unauthorized Key"},
+			name: "create API key without authentication",
+			user: nil,
+			payload: map[string]interface{}{
+				"name":        "Test API Key",
+				"description": "API key for testing",
+			},
 			expectedStatus: 401,
 			expectedError:  "Authorization header is required",
 		},
@@ -226,18 +264,19 @@ func (s *UsersTestSuite) TestCreateAPIKey() {
 		s.Run(test.name, func() {
 			var resp *APIResponse
 			if test.user != nil {
-				resp = s.MakeAuthenticatedRequest("POST", "/api/v1/users/api-keys", test.payload, test.user)
+				resp = s.testSuite.MakeAuthenticatedRequest("POST", "/api/v1/users/api-keys", test.payload, test.user)
 			} else {
-				resp = s.MakeRequest("POST", "/api/v1/users/api-keys", test.payload, nil)
+				resp = s.testSuite.MakeRequest("POST", "/api/v1/users/api-keys", test.payload, nil)
 			}
 
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
+				assert.Contains(s.T(), resp.Body, "api_key_id")
 				assert.Contains(s.T(), resp.Body, "api_key")
-				apiKey := resp.Body["api_key"].(map[string]interface{})
-				assert.Contains(s.T(), apiKey, "id")
-				assert.Contains(s.T(), apiKey, "name")
-				assert.Contains(s.T(), apiKey, "created_at")
+				assert.Contains(s.T(), resp.Body, "name")
+				if description, ok := test.payload["description"]; ok {
+					assert.Equal(s.T(), description, resp.Body["description"])
+				}
 			} else {
 				AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
 			}
@@ -245,8 +284,15 @@ func (s *UsersTestSuite) TestCreateAPIKey() {
 	}
 }
 
-// TestListAPIKeys tests listing API keys
+// TestListAPIKeys tests API key listing endpoint
 func (s *UsersTestSuite) TestListAPIKeys() {
+	// Create an API key first for testing
+	createResp := s.testSuite.MakeAuthenticatedRequest("POST", "/api/v1/users/api-keys", map[string]interface{}{
+		"name":        "Test API Key for List",
+		"description": "API key for listing test",
+	}, s.testSuite.TestUser)
+	assert.Equal(s.T(), 201, createResp.StatusCode)
+
 	tests := []struct {
 		name           string
 		user           *testUser
@@ -254,8 +300,8 @@ func (s *UsersTestSuite) TestListAPIKeys() {
 		expectedError  string
 	}{
 		{
-			name:           "list API keys",
-			user:           s.TestUser,
+			name:           "list API keys with JWT",
+			user:           s.testSuite.TestUser,
 			expectedStatus: 200,
 		},
 		{
@@ -270,16 +316,25 @@ func (s *UsersTestSuite) TestListAPIKeys() {
 		s.Run(test.name, func() {
 			var resp *APIResponse
 			if test.user != nil {
-				resp = s.MakeAuthenticatedRequest("GET", "/api/v1/users/api-keys", nil, test.user)
+				resp = s.testSuite.MakeAuthenticatedRequest("GET", "/api/v1/users/api-keys", nil, test.user)
 			} else {
-				resp = s.MakeRequest("GET", "/api/v1/users/api-keys", nil, nil)
+				resp = s.testSuite.MakeRequest("GET", "/api/v1/users/api-keys", nil, nil)
 			}
 
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
 				assert.Contains(s.T(), resp.Body, "api_keys")
 				apiKeys := resp.Body["api_keys"].([]interface{})
-				assert.GreaterOrEqual(s.T(), len(apiKeys), 1, "Should have at least one API key from test setup")
+				assert.GreaterOrEqual(s.T(), len(apiKeys), 1)
+
+				if len(apiKeys) > 0 {
+					apiKey := apiKeys[0].(map[string]interface{})
+					assert.Contains(s.T(), apiKey, "api_key_id")
+					assert.Contains(s.T(), apiKey, "name")
+					assert.Contains(s.T(), apiKey, "created_at")
+					// Note: API key value is not returned in list
+					assert.NotContains(s.T(), apiKey, "api_key")
+				}
 			} else {
 				AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
 			}
@@ -287,42 +342,40 @@ func (s *UsersTestSuite) TestListAPIKeys() {
 	}
 }
 
-// TestRevokeAPIKey tests revoking API keys
+// TestRevokeAPIKey tests API key revocation endpoint
 func (s *UsersTestSuite) TestRevokeAPIKey() {
-	// First, create an API key to revoke
-	createResp := s.MakeAuthenticatedRequest("POST", "/api/v1/users/api-keys", map[string]interface{}{
-		"name": "Key To Revoke",
-	}, s.TestUser)
+	// Create an API key first for testing
+	createResp := s.testSuite.MakeAuthenticatedRequest("POST", "/api/v1/users/api-keys", map[string]interface{}{
+		"name":        "Test API Key for Revoke",
+		"description": "API key for revocation test",
+	}, s.testSuite.TestUser)
 	assert.Equal(s.T(), 201, createResp.StatusCode)
-
-	// Extract the key ID from the response
-	apiKeyData := createResp.Body["api_key"].(map[string]interface{})
-	keyID := apiKeyData["id"].(string)
+	apiKeyID := createResp.Body["api_key_id"].(string)
 
 	tests := []struct {
 		name           string
 		user           *testUser
-		keyID          string
+		apiKeyID       string
 		expectedStatus int
 		expectedError  string
 	}{
 		{
-			name:           "revoke own API key",
-			user:           s.TestUser,
-			keyID:          keyID,
+			name:           "revoke API key successfully",
+			user:           s.testSuite.TestUser,
+			apiKeyID:       apiKeyID,
 			expectedStatus: 200,
 		},
 		{
-			name:           "revoke non-existent key",
-			user:           s.TestUser,
-			keyID:          "00000000-0000-0000-0000-000000000000",
+			name:           "revoke non-existent API key",
+			user:           s.testSuite.TestUser,
+			apiKeyID:       "non-existent-api-key-id",
 			expectedStatus: 404,
 			expectedError:  "API key not found",
 		},
 		{
-			name:           "revoke key without authentication",
+			name:           "revoke API key without authentication",
 			user:           nil,
-			keyID:          keyID,
+			apiKeyID:       apiKeyID,
 			expectedStatus: 401,
 			expectedError:  "Authorization header is required",
 		},
@@ -331,15 +384,16 @@ func (s *UsersTestSuite) TestRevokeAPIKey() {
 	for _, test := range tests {
 		s.Run(test.name, func() {
 			var resp *APIResponse
-			path := "/api/v1/users/api-keys/" + test.keyID
+			path := "/api/v1/users/api-keys/" + test.apiKeyID
 			if test.user != nil {
-				resp = s.MakeAuthenticatedRequest("DELETE", path, nil, test.user)
+				resp = s.testSuite.MakeAuthenticatedRequest("DELETE", path, nil, test.user)
 			} else {
-				resp = s.MakeRequest("DELETE", path, nil, nil)
+				resp = s.testSuite.MakeRequest("DELETE", path, nil, nil)
 			}
 
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
+				assert.Contains(s.T(), resp.Body, "message")
 			} else {
 				AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
 			}

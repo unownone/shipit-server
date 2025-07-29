@@ -11,7 +11,7 @@ import (
 // AuthTestSuite tests authentication endpoints
 type AuthTestSuite struct {
 	suite.Suite
-	*testSuite
+	testSuite *testSuite
 }
 
 func (s *AuthTestSuite) SetupTest() {
@@ -42,7 +42,7 @@ func (s *AuthTestSuite) TestUserRegistration() {
 		{
 			name: "duplicate email",
 			payload: map[string]interface{}{
-				"email":    s.TestUser.Email,
+				"email":    s.testSuite.TestUser.Email,
 				"password": "password123",
 				"name":     "Duplicate User",
 			},
@@ -80,7 +80,7 @@ func (s *AuthTestSuite) TestUserRegistration() {
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
-			resp := s.MakeRequest("POST", "/api/v1/users/register", test.payload, nil)
+			resp := s.testSuite.MakeRequest("POST", "/api/v1/users/register", test.payload, nil)
 
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
@@ -105,15 +105,15 @@ func (s *AuthTestSuite) TestUserLogin() {
 		{
 			name: "successful login",
 			payload: map[string]interface{}{
-				"email":    s.TestUser.Email,
-				"password": s.TestUser.Password,
+				"email":    s.testSuite.TestUser.Email,
+				"password": s.testSuite.TestUser.Password,
 			},
 			expectedStatus: 200,
 		},
 		{
 			name: "wrong password",
 			payload: map[string]interface{}{
-				"email":    s.TestUser.Email,
+				"email":    s.testSuite.TestUser.Email,
 				"password": "wrongpassword",
 			},
 			expectedStatus: 401,
@@ -140,7 +140,7 @@ func (s *AuthTestSuite) TestUserLogin() {
 		{
 			name: "missing password",
 			payload: map[string]interface{}{
-				"email": s.TestUser.Email,
+				"email": s.testSuite.TestUser.Email,
 			},
 			expectedStatus: 400,
 			expectedError:  "Invalid request data",
@@ -149,7 +149,7 @@ func (s *AuthTestSuite) TestUserLogin() {
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
-			resp := s.MakeRequest("POST", "/api/v1/users/login", test.payload, nil)
+			resp := s.testSuite.MakeRequest("POST", "/api/v1/users/login", test.payload, nil)
 
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
@@ -174,7 +174,7 @@ func (s *AuthTestSuite) TestRefreshToken() {
 		{
 			name: "successful token refresh",
 			payload: map[string]interface{}{
-				"refresh_token": s.TestUser.RefreshToken,
+				"refresh_token": s.testSuite.TestUser.RefreshToken,
 			},
 			expectedStatus: 200,
 		},
@@ -196,7 +196,7 @@ func (s *AuthTestSuite) TestRefreshToken() {
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
-			resp := s.MakeRequest("POST", "/api/v1/users/refresh", test.payload, nil)
+			resp := s.testSuite.MakeRequest("POST", "/api/v1/users/refresh", test.payload, nil)
 
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
@@ -218,7 +218,7 @@ func (s *AuthTestSuite) TestLogout() {
 	}{
 		{
 			name:           "successful logout",
-			user:           s.TestUser,
+			user:           s.testSuite.TestUser,
 			expectedStatus: 200,
 		},
 		{
@@ -233,11 +233,11 @@ func (s *AuthTestSuite) TestLogout() {
 		s.Run(test.name, func() {
 			var resp *APIResponse
 			if test.user != nil {
-				resp = s.MakeAuthenticatedRequest("POST", "/api/v1/users/logout", map[string]string{
+				resp = s.testSuite.MakeAuthenticatedRequest("POST", "/api/v1/users/logout", map[string]string{
 					"refresh_token": test.user.RefreshToken,
 				}, test.user)
 			} else {
-				resp = s.MakeRequest("POST", "/api/v1/users/logout", nil, nil)
+				resp = s.testSuite.MakeRequest("POST", "/api/v1/users/logout", nil, nil)
 			}
 
 			if test.expectedStatus < 400 {
@@ -260,7 +260,7 @@ func (s *AuthTestSuite) TestValidateToken() {
 		{
 			name: "valid JWT token",
 			payload: map[string]interface{}{
-				"token": s.TestUser.AccessToken,
+				"token": s.testSuite.TestUser.AccessToken,
 			},
 			expectedStatus: 200,
 			expectedValid:  true,
@@ -268,7 +268,7 @@ func (s *AuthTestSuite) TestValidateToken() {
 		{
 			name: "valid API key",
 			payload: map[string]interface{}{
-				"token": s.TestUser.APIKey,
+				"token": s.testSuite.TestUser.APIKey,
 			},
 			expectedStatus: 200,
 			expectedValid:  true,
@@ -290,7 +290,7 @@ func (s *AuthTestSuite) TestValidateToken() {
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
-			resp := s.MakeRequest("POST", "/api/v1/auth/validate", test.payload, nil)
+			resp := s.testSuite.MakeRequest("POST", "/api/v1/auth/validate", test.payload, nil)
 
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)

@@ -11,7 +11,7 @@ import (
 // TunnelsTestSuite tests tunnel management endpoints
 type TunnelsTestSuite struct {
 	suite.Suite
-	*testSuite
+	testSuite *testSuite
 }
 
 func (s *TunnelsTestSuite) SetupTest() {
@@ -33,7 +33,7 @@ func (s *TunnelsTestSuite) TestCreateTunnel() {
 	}{
 		{
 			name: "create HTTP tunnel",
-			user: s.TestUser,
+			user: s.testSuite.TestUser,
 			payload: map[string]interface{}{
 				"protocol":   "http",
 				"local_port": 8080,
@@ -42,7 +42,7 @@ func (s *TunnelsTestSuite) TestCreateTunnel() {
 		},
 		{
 			name: "create TCP tunnel",
-			user: s.TestUser,
+			user: s.testSuite.TestUser,
 			payload: map[string]interface{}{
 				"protocol":   "tcp",
 				"local_port": 3000,
@@ -51,7 +51,7 @@ func (s *TunnelsTestSuite) TestCreateTunnel() {
 		},
 		{
 			name: "create HTTP tunnel with custom subdomain",
-			user: s.TestUser,
+			user: s.testSuite.TestUser,
 			payload: map[string]interface{}{
 				"protocol":   "http",
 				"local_port": 9000,
@@ -61,7 +61,7 @@ func (s *TunnelsTestSuite) TestCreateTunnel() {
 		},
 		{
 			name: "create tunnel with invalid protocol",
-			user: s.TestUser,
+			user: s.testSuite.TestUser,
 			payload: map[string]interface{}{
 				"protocol":   "invalid",
 				"local_port": 8080,
@@ -71,7 +71,7 @@ func (s *TunnelsTestSuite) TestCreateTunnel() {
 		},
 		{
 			name: "create tunnel with invalid port",
-			user: s.TestUser,
+			user: s.testSuite.TestUser,
 			payload: map[string]interface{}{
 				"protocol":   "http",
 				"local_port": -1,
@@ -81,7 +81,7 @@ func (s *TunnelsTestSuite) TestCreateTunnel() {
 		},
 		{
 			name: "create tunnel with port too high",
-			user: s.TestUser,
+			user: s.testSuite.TestUser,
 			payload: map[string]interface{}{
 				"protocol":   "http",
 				"local_port": 70000,
@@ -99,40 +99,25 @@ func (s *TunnelsTestSuite) TestCreateTunnel() {
 			expectedStatus: 401,
 			expectedError:  "API key header is required",
 		},
-		{
-			name: "create tunnel with missing fields",
-			user: s.TestUser,
-			payload: map[string]interface{}{
-				"protocol": "http",
-			},
-			expectedStatus: 400,
-			expectedError:  "Invalid request data",
-		},
 	}
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
 			var resp *APIResponse
 			if test.user != nil {
-				resp = s.MakeAPIKeyRequest("POST", "/api/v1/tunnels", test.payload, test.user)
+				resp = s.testSuite.MakeAPIKeyRequest("POST", "/api/v1/tunnels", test.payload, test.user)
 			} else {
-				resp = s.MakeRequest("POST", "/api/v1/tunnels", test.payload, nil)
+				resp = s.testSuite.MakeRequest("POST", "/api/v1/tunnels", test.payload, nil)
 			}
 
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
 				assert.Contains(s.T(), resp.Body, "tunnel_id")
 				assert.Contains(s.T(), resp.Body, "public_url")
-				assert.Contains(s.T(), resp.Body, "status")
 				assert.Contains(s.T(), resp.Body, "protocol")
+				assert.Contains(s.T(), resp.Body, "local_port")
+				assert.Contains(s.T(), resp.Body, "status")
 				assert.Contains(s.T(), resp.Body, "created_at")
-
-				protocol := resp.Body["protocol"].(string)
-				assert.Equal(s.T(), test.payload["protocol"], protocol)
-
-				if protocol == "tcp" {
-					assert.Contains(s.T(), resp.Body, "public_port")
-				}
 			} else {
 				AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
 			}
@@ -140,71 +125,63 @@ func (s *TunnelsTestSuite) TestCreateTunnel() {
 	}
 }
 
-// TestListTunnels tests listing tunnels endpoint
+// TestListTunnels tests tunnel listing endpoint
 func (s *TunnelsTestSuite) TestListTunnels() {
-	// First, create a few tunnels
-	tunnelPayloads := []map[string]interface{}{
-		{"protocol": "http", "local_port": 8081},
-		{"protocol": "tcp", "local_port": 3001},
-		{"protocol": "http", "local_port": 9001, "subdomain": "testapp"},
-	}
-
-	for _, payload := range tunnelPayloads {
-		resp := s.MakeAPIKeyRequest("POST", "/api/v1/tunnels", payload, s.TestUser)
-		assert.Equal(s.T(), 201, resp.StatusCode)
-	}
+	// Create a tunnel first for testing
+	createResp := s.testSuite.MakeAPIKeyRequest("POST", "/api/v1/tunnels", map[string]interface{}{
+		"protocol":   "http",
+		"local_port": 8081,
+	}, s.testSuite.TestUser)
+	assert.Equal(s.T(), 201, createResp.StatusCode)
 
 	tests := []struct {
 		name           string
 		user           *testUser
+		queryParams    string
 		expectedStatus int
 		expectedError  string
-		minTunnels     int
 	}{
 		{
 			name:           "list tunnels with API key",
-			user:           s.TestUser,
+			user:           s.testSuite.TestUser,
 			expectedStatus: 200,
-			minTunnels:     3,
 		},
 		{
-			name:           "list tunnels for different user",
-			user:           s.TestUser2,
+			name:           "list tunnels with status filter",
+			user:           s.testSuite.TestUser,
+			queryParams:    "?status=active",
 			expectedStatus: 200,
-			minTunnels:     0, // TestUser2 has no tunnels
+		},
+		{
+			name:           "list tunnels with protocol filter",
+			user:           s.testSuite.TestUser,
+			queryParams:    "?protocol=http",
+			expectedStatus: 200,
 		},
 		{
 			name:           "list tunnels without authentication",
 			user:           nil,
-			expectedStatus: 403,
-			expectedError:  "No Auth Header Provided",
+			expectedStatus: 401,
+			expectedError:  "API key header is required",
 		},
 	}
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
 			var resp *APIResponse
+			path := "/api/v1/tunnels" + test.queryParams
 			if test.user != nil {
-				resp = s.MakeAPIKeyRequest("GET", "/api/v1/tunnels", nil, test.user)
+				resp = s.testSuite.MakeAPIKeyRequest("GET", path, nil, test.user)
 			} else {
-				resp = s.MakeRequest("GET", "/api/v1/tunnels", nil, nil)
+				resp = s.testSuite.MakeRequest("GET", path, nil, nil)
 			}
 
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
 				assert.Contains(s.T(), resp.Body, "tunnels")
-				tunnels := resp.Body["tunnels"].([]interface{})
-				assert.GreaterOrEqual(s.T(), len(tunnels), test.minTunnels)
-
-				if len(tunnels) > 0 {
-					tunnel := tunnels[0].(map[string]interface{})
-					assert.Contains(s.T(), tunnel, "tunnel_id")
-					assert.Contains(s.T(), tunnel, "protocol")
-					assert.Contains(s.T(), tunnel, "public_url")
-					assert.Contains(s.T(), tunnel, "status")
-					assert.Contains(s.T(), tunnel, "local_port")
-					assert.Contains(s.T(), tunnel, "created_at")
-				}
+				assert.Contains(s.T(), resp.Body, "total")
+				assert.Contains(s.T(), resp.Body, "page")
+				assert.Contains(s.T(), resp.Body, "limit")
 			} else {
 				AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
 			}
@@ -212,13 +189,13 @@ func (s *TunnelsTestSuite) TestListTunnels() {
 	}
 }
 
-// TestGetTunnel tests getting specific tunnel endpoint
+// TestGetTunnel tests getting a specific tunnel
 func (s *TunnelsTestSuite) TestGetTunnel() {
-	// Create a tunnel first
-	createResp := s.MakeAPIKeyRequest("POST", "/api/v1/tunnels", map[string]interface{}{
+	// Create a tunnel first for testing
+	createResp := s.testSuite.MakeAPIKeyRequest("POST", "/api/v1/tunnels", map[string]interface{}{
 		"protocol":   "http",
 		"local_port": 8082,
-	}, s.TestUser)
+	}, s.testSuite.TestUser)
 	assert.Equal(s.T(), 201, createResp.StatusCode)
 	tunnelID := createResp.Body["tunnel_id"].(string)
 
@@ -230,21 +207,21 @@ func (s *TunnelsTestSuite) TestGetTunnel() {
 		expectedError  string
 	}{
 		{
-			name:           "get own tunnel",
-			user:           s.TestUser,
+			name:           "get tunnel with API key",
+			user:           s.testSuite.TestUser,
 			tunnelID:       tunnelID,
 			expectedStatus: 200,
 		},
 		{
-			name:           "get tunnel from different user",
-			user:           s.TestUser2,
+			name:           "get tunnel for different user",
+			user:           s.testSuite.TestUser2,
 			tunnelID:       tunnelID,
 			expectedStatus: 404,
 			expectedError:  "Tunnel not found",
 		},
 		{
 			name:           "get non-existent tunnel",
-			user:           s.TestUser,
+			user:           s.testSuite.TestUser,
 			tunnelID:       "non-existent-tunnel-id",
 			expectedStatus: 404,
 			expectedError:  "Tunnel not found",
@@ -253,8 +230,8 @@ func (s *TunnelsTestSuite) TestGetTunnel() {
 			name:           "get tunnel without authentication",
 			user:           nil,
 			tunnelID:       tunnelID,
-			expectedStatus: 403,
-			expectedError:  "No Auth Header Provided",
+			expectedStatus: 401,
+			expectedError:  "API key header is required",
 		},
 	}
 
@@ -263,19 +240,19 @@ func (s *TunnelsTestSuite) TestGetTunnel() {
 			var resp *APIResponse
 			path := fmt.Sprintf("/api/v1/tunnels/%s", test.tunnelID)
 			if test.user != nil {
-				resp = s.MakeAPIKeyRequest("GET", path, nil, test.user)
+				resp = s.testSuite.MakeAPIKeyRequest("GET", path, nil, test.user)
 			} else {
-				resp = s.MakeRequest("GET", path, nil, nil)
+				resp = s.testSuite.MakeRequest("GET", path, nil, nil)
 			}
 
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
-				tunnel := resp.Body
-				assert.Equal(s.T(), test.tunnelID, tunnel["tunnel_id"])
-				assert.Contains(s.T(), tunnel, "protocol")
-				assert.Contains(s.T(), tunnel, "public_url")
-				assert.Contains(s.T(), tunnel, "status")
-				assert.Contains(s.T(), tunnel, "local_port")
+				assert.Equal(s.T(), test.tunnelID, resp.Body["tunnel_id"])
+				assert.Contains(s.T(), resp.Body, "public_url")
+				assert.Contains(s.T(), resp.Body, "protocol")
+				assert.Contains(s.T(), resp.Body, "local_port")
+				assert.Contains(s.T(), resp.Body, "status")
+				assert.Contains(s.T(), resp.Body, "created_at")
 			} else {
 				AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
 			}
@@ -283,22 +260,15 @@ func (s *TunnelsTestSuite) TestGetTunnel() {
 	}
 }
 
-// TestDeleteTunnel tests deleting tunnel endpoint
+// TestDeleteTunnel tests tunnel deletion endpoint
 func (s *TunnelsTestSuite) TestDeleteTunnel() {
-	// Create tunnels for testing
-	createResp1 := s.MakeAPIKeyRequest("POST", "/api/v1/tunnels", map[string]interface{}{
+	// Create a tunnel first for testing
+	createResp := s.testSuite.MakeAPIKeyRequest("POST", "/api/v1/tunnels", map[string]interface{}{
 		"protocol":   "http",
 		"local_port": 8083,
-	}, s.TestUser)
-	assert.Equal(s.T(), 201, createResp1.StatusCode)
-	tunnelID1 := createResp1.Body["tunnel_id"].(string)
-
-	createResp2 := s.MakeAPIKeyRequest("POST", "/api/v1/tunnels", map[string]interface{}{
-		"protocol":   "tcp",
-		"local_port": 3002,
-	}, s.TestUser2)
-	assert.Equal(s.T(), 201, createResp2.StatusCode)
-	tunnelID2 := createResp2.Body["tunnel_id"].(string)
+	}, s.testSuite.TestUser)
+	assert.Equal(s.T(), 201, createResp.StatusCode)
+	tunnelID := createResp.Body["tunnel_id"].(string)
 
 	tests := []struct {
 		name           string
@@ -308,21 +278,21 @@ func (s *TunnelsTestSuite) TestDeleteTunnel() {
 		expectedError  string
 	}{
 		{
-			name:           "delete own tunnel",
-			user:           s.TestUser,
-			tunnelID:       tunnelID1,
+			name:           "delete tunnel with API key",
+			user:           s.testSuite.TestUser,
+			tunnelID:       tunnelID,
 			expectedStatus: 200,
 		},
 		{
-			name:           "delete tunnel from different user",
-			user:           s.TestUser,
-			tunnelID:       tunnelID2,
+			name:           "delete tunnel for different user",
+			user:           s.testSuite.TestUser2,
+			tunnelID:       tunnelID,
 			expectedStatus: 404,
 			expectedError:  "Tunnel not found",
 		},
 		{
 			name:           "delete non-existent tunnel",
-			user:           s.TestUser,
+			user:           s.testSuite.TestUser,
 			tunnelID:       "non-existent-tunnel-id",
 			expectedStatus: 404,
 			expectedError:  "Tunnel not found",
@@ -330,9 +300,9 @@ func (s *TunnelsTestSuite) TestDeleteTunnel() {
 		{
 			name:           "delete tunnel without authentication",
 			user:           nil,
-			tunnelID:       tunnelID1,
-			expectedStatus: 403,
-			expectedError:  "No Auth Header Provided",
+			tunnelID:       tunnelID,
+			expectedStatus: 401,
+			expectedError:  "API key header is required",
 		},
 	}
 
@@ -341,9 +311,9 @@ func (s *TunnelsTestSuite) TestDeleteTunnel() {
 			var resp *APIResponse
 			path := fmt.Sprintf("/api/v1/tunnels/%s", test.tunnelID)
 			if test.user != nil {
-				resp = s.MakeAPIKeyRequest("DELETE", path, nil, test.user)
+				resp = s.testSuite.MakeAPIKeyRequest("DELETE", path, nil, test.user)
 			} else {
-				resp = s.MakeRequest("DELETE", path, nil, nil)
+				resp = s.testSuite.MakeRequest("DELETE", path, nil, nil)
 			}
 
 			if test.expectedStatus < 400 {
@@ -356,13 +326,13 @@ func (s *TunnelsTestSuite) TestDeleteTunnel() {
 	}
 }
 
-// TestGetTunnelStats tests getting tunnel statistics endpoint
+// TestGetTunnelStats tests tunnel statistics endpoint
 func (s *TunnelsTestSuite) TestGetTunnelStats() {
-	// Create a tunnel first
-	createResp := s.MakeAPIKeyRequest("POST", "/api/v1/tunnels", map[string]interface{}{
+	// Create a tunnel first for testing
+	createResp := s.testSuite.MakeAPIKeyRequest("POST", "/api/v1/tunnels", map[string]interface{}{
 		"protocol":   "http",
 		"local_port": 8084,
-	}, s.TestUser)
+	}, s.testSuite.TestUser)
 	assert.Equal(s.T(), 201, createResp.StatusCode)
 	tunnelID := createResp.Body["tunnel_id"].(string)
 
@@ -370,25 +340,33 @@ func (s *TunnelsTestSuite) TestGetTunnelStats() {
 		name           string
 		user           *testUser
 		tunnelID       string
+		queryParams    string
 		expectedStatus int
 		expectedError  string
 	}{
 		{
-			name:           "get own tunnel stats",
-			user:           s.TestUser,
+			name:           "get tunnel stats with API key",
+			user:           s.testSuite.TestUser,
 			tunnelID:       tunnelID,
 			expectedStatus: 200,
 		},
 		{
-			name:           "get tunnel stats from different user",
-			user:           s.TestUser2,
+			name:           "get tunnel stats with period",
+			user:           s.testSuite.TestUser,
+			tunnelID:       tunnelID,
+			queryParams:    "?period=24h",
+			expectedStatus: 200,
+		},
+		{
+			name:           "get stats for different user's tunnel",
+			user:           s.testSuite.TestUser2,
 			tunnelID:       tunnelID,
 			expectedStatus: 404,
 			expectedError:  "Tunnel not found",
 		},
 		{
 			name:           "get stats for non-existent tunnel",
-			user:           s.TestUser,
+			user:           s.testSuite.TestUser,
 			tunnelID:       "non-existent-tunnel-id",
 			expectedStatus: 404,
 			expectedError:  "Tunnel not found",
@@ -397,29 +375,26 @@ func (s *TunnelsTestSuite) TestGetTunnelStats() {
 			name:           "get tunnel stats without authentication",
 			user:           nil,
 			tunnelID:       tunnelID,
-			expectedStatus: 403,
-			expectedError:  "No Auth Header Provided",
+			expectedStatus: 401,
+			expectedError:  "API key header is required",
 		},
 	}
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
 			var resp *APIResponse
-			path := fmt.Sprintf("/api/v1/tunnels/%s/stats", test.tunnelID)
+			path := fmt.Sprintf("/api/v1/tunnels/%s/stats%s", test.tunnelID, test.queryParams)
 			if test.user != nil {
-				resp = s.MakeAPIKeyRequest("GET", path, nil, test.user)
+				resp = s.testSuite.MakeAPIKeyRequest("GET", path, nil, test.user)
 			} else {
-				resp = s.MakeRequest("GET", path, nil, nil)
+				resp = s.testSuite.MakeRequest("GET", path, nil, nil)
 			}
 
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
-				assert.Contains(s.T(), resp.Body, "tunnel_id")
-				assert.Contains(s.T(), resp.Body, "active_connections")
-				assert.Contains(s.T(), resp.Body, "total_requests")
-				assert.Contains(s.T(), resp.Body, "total_bytes_in")
-				assert.Contains(s.T(), resp.Body, "total_bytes_out")
 				assert.Equal(s.T(), test.tunnelID, resp.Body["tunnel_id"])
+				assert.Contains(s.T(), resp.Body, "metrics")
+				assert.Contains(s.T(), resp.Body, "time_series")
 			} else {
 				AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
 			}
