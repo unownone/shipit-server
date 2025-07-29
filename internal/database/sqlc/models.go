@@ -12,8 +12,8 @@ import (
 )
 
 type ApiKeys struct {
-	ID         uuid.UUID        `db:"id" json:"id"`
-	UserID     uuid.UUID        `db:"user_id" json:"user_id"`
+	ID         uuid.UUID          `db:"id" json:"id"`
+	UserID     uuid.UUID          `db:"user_id" json:"user_id"`
 	Name       string             `db:"name" json:"name"`
 	Prefix     string             `db:"prefix" json:"prefix"`
 	Hash       string             `db:"hash" json:"hash"`
@@ -26,8 +26,8 @@ type ApiKeys struct {
 }
 
 type Connections struct {
-	ID         uuid.UUID        `db:"id" json:"id"`
-	TunnelID   uuid.UUID        `db:"tunnel_id" json:"tunnel_id"`
+	ID         uuid.UUID          `db:"id" json:"id"`
+	TunnelID   uuid.UUID          `db:"tunnel_id" json:"tunnel_id"`
 	RemoteAddr netip.Addr         `db:"remote_addr" json:"remote_addr"`
 	LocalAddr  netip.Addr         `db:"local_addr" json:"local_addr"`
 	IsActive   bool               `db:"is_active" json:"is_active"`
@@ -38,7 +38,7 @@ type Connections struct {
 }
 
 type LoginAttempts struct {
-	ID            uuid.UUID        `db:"id" json:"id"`
+	ID            uuid.UUID          `db:"id" json:"id"`
 	Email         string             `db:"email" json:"email"`
 	IpAddress     netip.Addr         `db:"ip_address" json:"ip_address"`
 	Success       bool               `db:"success" json:"success"`
@@ -48,8 +48,8 @@ type LoginAttempts struct {
 }
 
 type RefreshTokens struct {
-	ID        uuid.UUID        `db:"id" json:"id"`
-	UserID    uuid.UUID        `db:"user_id" json:"user_id"`
+	ID        uuid.UUID          `db:"id" json:"id"`
+	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
 	TokenHash string             `db:"token_hash" json:"token_hash"`
 	IsRevoked bool               `db:"is_revoked" json:"is_revoked"`
 	ExpiresAt pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
@@ -57,8 +57,8 @@ type RefreshTokens struct {
 }
 
 type TunnelAnalytics struct {
-	ID              uuid.UUID        `db:"id" json:"id"`
-	TunnelID        uuid.UUID        `db:"tunnel_id" json:"tunnel_id"`
+	ID              uuid.UUID          `db:"id" json:"id"`
+	TunnelID        uuid.UUID          `db:"tunnel_id" json:"tunnel_id"`
 	RequestsCount   int64              `db:"requests_count" json:"requests_count"`
 	BytesIn         int64              `db:"bytes_in" json:"bytes_in"`
 	BytesOut        int64              `db:"bytes_out" json:"bytes_out"`
@@ -68,15 +68,15 @@ type TunnelAnalytics struct {
 }
 
 type Tunnels struct {
-	ID             uuid.UUID        `db:"id" json:"id"`
-	UserID         uuid.UUID        `db:"user_id" json:"user_id"`
+	ID             uuid.UUID          `db:"id" json:"id"`
+	UserID         uuid.UUID          `db:"user_id" json:"user_id"`
 	Name           string             `db:"name" json:"name"`
 	Protocol       string             `db:"protocol" json:"protocol"`
 	Subdomain      pgtype.Text        `db:"subdomain" json:"subdomain"`
 	CustomDomain   pgtype.Text        `db:"custom_domain" json:"custom_domain"`
 	TargetHost     string             `db:"target_host" json:"target_host"`
 	TargetPort     int32              `db:"target_port" json:"target_port"`
-	PublicPort     *int32              `db:"public_port" json:"public_port,omitempty"`
+	PublicPort     *int32             `db:"public_port" json:"public_port,omitempty"`
 	Status         string             `db:"status" json:"status"`
 	AuthToken      pgtype.Text        `db:"auth_token" json:"auth_token"`
 	MaxConnections pgtype.Int4        `db:"max_connections" json:"max_connections"`
@@ -87,8 +87,8 @@ type Tunnels struct {
 }
 
 type UserSessions struct {
-	ID           uuid.UUID        `db:"id" json:"id"`
-	UserID       uuid.UUID        `db:"user_id" json:"user_id"`
+	ID           uuid.UUID          `db:"id" json:"id"`
+	UserID       uuid.UUID          `db:"user_id" json:"user_id"`
 	SessionToken string             `db:"session_token" json:"session_token"`
 	IpAddress    *netip.Addr        `db:"ip_address" json:"ip_address"`
 	UserAgent    pgtype.Text        `db:"user_agent" json:"user_agent"`
@@ -99,7 +99,7 @@ type UserSessions struct {
 }
 
 type Users struct {
-	ID                     uuid.UUID        `db:"id" json:"id"`
+	ID                     uuid.UUID          `db:"id" json:"id"`
 	Email                  string             `db:"email" json:"email"`
 	PasswordHash           string             `db:"password_hash" json:"password_hash"`
 	Name                   string             `db:"name" json:"name"`

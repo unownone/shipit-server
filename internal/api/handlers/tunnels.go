@@ -231,21 +231,19 @@ func (h *TunnelHandler) CreateTunnel(c *gin.Context) {
 	})
 	if err != nil {
 		logger.WithFields(logrus.Fields{
-			"error": err,
-			"user_id": userID,
+			"error":       err,
+			"user_id":     userID,
 			"tunnel_name": tunnelName,
-			"subdomain": subdomain,
+			"subdomain":   subdomain,
 			"public_port": publicPort,
-			"public_url": publicURL,
-			"expires_at": defaultExpiry,
+			"public_url":  publicURL,
+			"expires_at":  defaultExpiry,
 		}).Error("Failed to create tunnel")
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to create tunnel",
 		})
 		return
 	}
-
-
 
 	response := CreateTunnelResponse{
 		TunnelID:  tunnel.ID.String(),

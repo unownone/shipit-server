@@ -233,7 +233,7 @@ WHERE id = $1
 `
 
 type SetEmailVerificationTokenParams struct {
-	ID                     uuid.UUID `db:"id" json:"id"`
+	ID                     uuid.UUID   `db:"id" json:"id"`
 	EmailVerificationToken pgtype.Text `db:"email_verification_token" json:"email_verification_token"`
 }
 
@@ -268,10 +268,10 @@ RETURNING id, email, password_hash, name, role, is_active, email_verified, email
 
 type UpdateUserParams struct {
 	ID            uuid.UUID `db:"id" json:"id"`
-	Name          string      `db:"name" json:"name"`
-	Email         string      `db:"email" json:"email"`
-	Role          string      `db:"role" json:"role"`
-	EmailVerified bool        `db:"email_verified" json:"email_verified"`
+	Name          string    `db:"name" json:"name"`
+	Email         string    `db:"email" json:"email"`
+	Role          string    `db:"role" json:"role"`
+	EmailVerified bool      `db:"email_verified" json:"email_verified"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (Users, error) {
@@ -322,7 +322,7 @@ WHERE id = $1 AND is_active = true
 
 type UpdateUserPasswordParams struct {
 	ID           uuid.UUID `db:"id" json:"id"`
-	PasswordHash string      `db:"password_hash" json:"password_hash"`
+	PasswordHash string    `db:"password_hash" json:"password_hash"`
 }
 
 func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error {

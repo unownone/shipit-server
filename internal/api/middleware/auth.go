@@ -50,7 +50,6 @@ func (am *AuthMiddleware) authenticateJWT(ctx context.Context, token string) Aut
 
 	// Extract UUID from uuid.UUID for context storage
 
-
 	return AuthResult{
 		User:     user,
 		UserID:   user.ID,
@@ -70,8 +69,6 @@ func (am *AuthMiddleware) authenticateAPIKey(ctx context.Context, apiKey string)
 			Error:   err,
 		}
 	}
-
-
 
 	return AuthResult{
 		User:     user,
@@ -218,7 +215,6 @@ func (am *AuthMiddleware) CombinedAuth() gin.HandlerFunc {
 		c.Abort()
 	}
 }
-
 
 func (am *AuthMiddleware) OptionalAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {

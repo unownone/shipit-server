@@ -35,14 +35,14 @@ type TestSuite struct {
 	PasswordManager *auth.PasswordManager
 	JWTManager      *auth.JWTManager
 	APIKeyManager   *auth.APIKeyManager
-	
+
 	// Testcontainers
 	PostgresContainer *testcontainers.DockerContainer
-	
+
 	// Test users for authentication
-	TestUser     *TestUser
-	TestUser2    *TestUser
-	AdminUser    *TestUser
+	TestUser  *TestUser
+	TestUser2 *TestUser
+	AdminUser *TestUser
 }
 
 // TestUser represents a test user with credentials
@@ -70,14 +70,14 @@ func SetupTestSuite(t *testing.T) *TestSuite {
 	gin.SetMode(gin.TestMode)
 
 	ctx := context.Background()
-	
+
 	// Start PostgreSQL container
 	postgresContainer, err := testcontainers.Run(ctx,
 		"postgres:15-alpine",
 		testcontainers.WithEnv(map[string]string{
-			"POSTGRES_USER": "shipit_test",
+			"POSTGRES_USER":     "shipit_test",
 			"POSTGRES_PASSWORD": "test_password",
-			"POSTGRES_DB": "shipit_test",
+			"POSTGRES_DB":       "shipit_test",
 		}),
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
@@ -89,7 +89,7 @@ func SetupTestSuite(t *testing.T) *TestSuite {
 	// Get database connection details
 	host, err := postgresContainer.Host(ctx)
 	require.NoError(t, err)
-	
+
 	port, err := postgresContainer.MappedPort(ctx, "5432")
 	require.NoError(t, err)
 
@@ -104,9 +104,9 @@ func SetupTestSuite(t *testing.T) *TestSuite {
 			SSLMode:  "disable",
 		},
 		JWT: config.JWTConfig{
-			SecretKey:            "test-jwt-secret-that-is-long-enough-for-testing",
-			AccessTokenExpiry:    15 * time.Minute,
-			RefreshTokenExpiry:   24 * time.Hour,
+			SecretKey:          "test-jwt-secret-that-is-long-enough-for-testing",
+			AccessTokenExpiry:  15 * time.Minute,
+			RefreshTokenExpiry: 24 * time.Hour,
 		},
 		Auth: config.AuthConfig{
 			HashCost: 4, // Lower cost for faster tests
@@ -121,11 +121,11 @@ func SetupTestSuite(t *testing.T) *TestSuite {
 			AllowedHeaders: []string{"*"},
 		},
 		Tunnels: config.TunnelsConfig{
-			MaxPerUser: 10,
+			MaxPerUser:         10,
 			ConnectionPoolSize: 10,
-			SubdomainLength: 10, // 2 characters
-			DefaultTTL: 10 * time.Minute,
-			DomainHost: "localhost", // TODO: change domain to accept any host
+			SubdomainLength:    10, // 2 characters
+			DefaultTTL:         10 * time.Minute,
+			DomainHost:         "localhost", // TODO: change domain to accept any host
 		},
 	}
 
@@ -147,7 +147,7 @@ func SetupTestSuite(t *testing.T) *TestSuite {
 	// Test database connection
 	testCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	err = db.Health(testCtx)
 	require.NoError(t, err, "Database health check failed")
 
@@ -274,7 +274,7 @@ func applyMigrationFiles(ctx context.Context, db *database.Database, migrationsD
 		}
 
 		fmt.Printf("Applying migration: %s\n", filepath.Base(file))
-		
+
 		content, err := os.ReadFile(file)
 		if err != nil {
 			return fmt.Errorf("failed to read migration file %s: %w", file, err)
@@ -323,10 +323,10 @@ func (s *TestSuite) createTestUsers(t *testing.T) {
 
 	// Create regular test user
 	s.TestUser = s.createUser(t, ctx, "test@example.com", "testpassword123", "Test User", string(auth.RoleUser))
-	
+
 	// Create second test user
 	s.TestUser2 = s.createUser(t, ctx, "test2@example.com", "testpassword123", "Test User 2", string(auth.RoleUser))
-	
+
 	// Create admin user
 	s.AdminUser = s.createUser(t, ctx, "admin@example.com", "adminpassword123", "Admin User", string(auth.RoleAdmin))
 }
@@ -448,9 +448,9 @@ func AssertErrorResponse(t *testing.T, resp *APIResponse, expectedStatus int, ex
 func WaitForCondition(t *testing.T, condition func() bool, timeout time.Duration, message string) {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
-	
+
 	timeoutCh := time.After(timeout)
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -473,35 +473,35 @@ type ContainerInfo struct {
 // GetContainerInfo returns information about running test containers
 func (s *TestSuite) GetContainerInfo(t *testing.T) *ContainerInfo {
 	ctx := context.Background()
-	
+
 	host, err := s.PostgresContainer.Host(ctx)
 	require.NoError(t, err)
-	
+
 	port, err := s.PostgresContainer.MappedPort(ctx, "5432")
 	require.NoError(t, err)
-	
+
 	dbURL, err := getConnectionString(s.PostgresContainer, s.Config)
 	require.NoError(t, err)
-	
+
 	return &ContainerInfo{
 		PostgresHost: host,
 		PostgresPort: port.Int(),
 		DatabaseURL:  dbURL,
 	}
-} 
+}
 
 func getConnectionString(container *testcontainers.DockerContainer, config *config.Config) (string, error) {
 	ctx := context.Background()
-	
+
 	host, err := container.Host(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get container host: %w", err)
 	}
-	
+
 	port, err := container.MappedPort(ctx, "5432")
 	if err != nil {
 		return "", fmt.Errorf("failed to get container port: %w", err)
 	}
-	
+
 	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s", config.Database.User, config.Database.Password, host, port.Int(), config.Database.Name), nil
 }

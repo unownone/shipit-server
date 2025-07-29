@@ -126,10 +126,10 @@ func (s *TunnelsTestSuite) TestCreateTunnel() {
 				assert.Contains(s.T(), resp.Body, "status")
 				assert.Contains(s.T(), resp.Body, "protocol")
 				assert.Contains(s.T(), resp.Body, "created_at")
-				
+
 				protocol := resp.Body["protocol"].(string)
 				assert.Equal(s.T(), test.payload["protocol"], protocol)
-				
+
 				if protocol == "tcp" {
 					assert.Contains(s.T(), resp.Body, "public_port")
 				}
@@ -195,7 +195,7 @@ func (s *TunnelsTestSuite) TestListTunnels() {
 				assert.Contains(s.T(), resp.Body, "tunnels")
 				tunnels := resp.Body["tunnels"].([]interface{})
 				assert.GreaterOrEqual(s.T(), len(tunnels), test.minTunnels)
-				
+
 				if len(tunnels) > 0 {
 					tunnel := tunnels[0].(map[string]interface{})
 					assert.Contains(s.T(), tunnel, "tunnel_id")
@@ -429,4 +429,4 @@ func (s *TunnelsTestSuite) TestGetTunnelStats() {
 
 func TestTunnelsTestSuite(t *testing.T) {
 	suite.Run(t, new(TunnelsTestSuite))
-} 
+}

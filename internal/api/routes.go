@@ -85,7 +85,6 @@ func SetupRoutes(
 		apiProtected.POST("/tunnels", tunnelHandler.CreateTunnel)
 	}
 
-
 	optionalAuth := v1.Group("/")
 	optionalAuth.Use(authMiddleware.OptionalAuth())
 	{
@@ -128,4 +127,4 @@ func SetupRoutes(
 			c.JSON(200, gin.H{"message": "System statistics endpoint"})
 		})
 	}
-} 
+}

@@ -80,7 +80,7 @@ func (s *AuthTestSuite) TestUserRegistration() {
 	for _, test := range tests {
 		s.Run(test.name, func() {
 			resp := s.MakeRequest("POST", "/api/v1/users/register", test.payload, nil)
-			
+
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
 				assert.Contains(s.T(), resp.Body, "user_id")
@@ -149,7 +149,7 @@ func (s *AuthTestSuite) TestUserLogin() {
 	for _, test := range tests {
 		s.Run(test.name, func() {
 			resp := s.MakeRequest("POST", "/api/v1/users/login", test.payload, nil)
-			
+
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
 				assert.Contains(s.T(), resp.Body, "access_token")
@@ -186,8 +186,8 @@ func (s *AuthTestSuite) TestRefreshToken() {
 			expectedError:  "Invalid or expired refresh token",
 		},
 		{
-			name: "missing refresh token",
-			payload: map[string]interface{}{},
+			name:           "missing refresh token",
+			payload:        map[string]interface{}{},
 			expectedStatus: 400,
 			expectedError:  "Invalid request data",
 		},
@@ -196,7 +196,7 @@ func (s *AuthTestSuite) TestRefreshToken() {
 	for _, test := range tests {
 		s.Run(test.name, func() {
 			resp := s.MakeRequest("POST", "/api/v1/users/refresh", test.payload, nil)
-			
+
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
 				assert.Contains(s.T(), resp.Body, "access_token")
@@ -238,7 +238,7 @@ func (s *AuthTestSuite) TestLogout() {
 			} else {
 				resp = s.MakeRequest("POST", "/api/v1/users/logout", nil, nil)
 			}
-			
+
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
 			} else {
@@ -281,8 +281,8 @@ func (s *AuthTestSuite) TestValidateToken() {
 			expectedValid:  false,
 		},
 		{
-			name: "missing token",
-			payload: map[string]interface{}{},
+			name:           "missing token",
+			payload:        map[string]interface{}{},
 			expectedStatus: 400,
 		},
 	}
@@ -290,7 +290,7 @@ func (s *AuthTestSuite) TestValidateToken() {
 	for _, test := range tests {
 		s.Run(test.name, func() {
 			resp := s.MakeRequest("POST", "/api/v1/auth/validate", test.payload, nil)
-			
+
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
 				assert.Equal(s.T(), test.expectedValid, resp.Body["valid"])
@@ -307,4 +307,4 @@ func (s *AuthTestSuite) TestValidateToken() {
 
 func TestAuthTestSuite(t *testing.T) {
 	suite.Run(t, new(AuthTestSuite))
-} 
+}

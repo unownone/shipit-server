@@ -509,4 +509,4 @@ func (h *UserHandler) RevokeAPIKey(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "API key revoked successfully",
 	})
-} 
+}

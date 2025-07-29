@@ -17,24 +17,24 @@ import (
 
 // Collector handles real-time analytics collection and storage
 type Collector struct {
-	db     *database.Database
-	
+	db *database.Database
+
 	// In-memory metrics before batch insert
 	metricsBatch map[uuid.UUID]*TunnelMetrics
 	eventQueue   chan *AnalyticsEvent
-	
+
 	// Configuration
 	batchSize       int
 	batchInterval   time.Duration
 	queueSize       int
 	retentionPeriod time.Duration
-	
+
 	// Background processing
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 	mutex  sync.RWMutex
-	
+
 	// Statistics
 	totalEvents     int64
 	eventsProcessed int64
@@ -44,43 +44,43 @@ type Collector struct {
 
 // AnalyticsEvent represents a single analytics event
 type AnalyticsEvent struct {
-	TunnelID      uuid.UUID
-	EventType     EventType
-	Timestamp     time.Time
-	RequestID     string
-	ConnectionID  string
-	Method        string
-	Path          string
-	StatusCode    int
-	BytesIn       int64
-	BytesOut      int64
-	ResponseTime  time.Duration
-	ClientIP      string
-	UserAgent     string
-	ErrorMessage  string
-	Metadata      map[string]interface{}
+	TunnelID     uuid.UUID
+	EventType    EventType
+	Timestamp    time.Time
+	RequestID    string
+	ConnectionID string
+	Method       string
+	Path         string
+	StatusCode   int
+	BytesIn      int64
+	BytesOut     int64
+	ResponseTime time.Duration
+	ClientIP     string
+	UserAgent    string
+	ErrorMessage string
+	Metadata     map[string]interface{}
 }
 
 // TunnelMetrics holds aggregated metrics for a tunnel
 type TunnelMetrics struct {
-	TunnelID         uuid.UUID
-	RequestsCount    int64
-	BytesIn          int64
-	BytesOut         int64
-	ErrorCount       int64
+	TunnelID          uuid.UUID
+	RequestsCount     int64
+	BytesIn           int64
+	BytesOut          int64
+	ErrorCount        int64
 	TotalResponseTime time.Duration
-	MinResponseTime  time.Duration
-	MaxResponseTime  time.Duration
-	LastActivity     time.Time
+	MinResponseTime   time.Duration
+	MaxResponseTime   time.Duration
+	LastActivity      time.Time
 	ActiveConnections int32
-	
+
 	// Detailed breakdowns
-	StatusCodes   map[int]int64
-	Methods       map[string]int64
-	Paths         map[string]int64
-	IPs           map[string]int64
-	UserAgents    map[string]int64
-	
+	StatusCodes map[int]int64
+	Methods     map[string]int64
+	Paths       map[string]int64
+	IPs         map[string]int64
+	UserAgents  map[string]int64
+
 	mutex sync.RWMutex
 }
 
@@ -98,46 +98,46 @@ const (
 // NewCollector creates a new analytics collector
 func NewCollector(db *database.Database) *Collector {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	collector := &Collector{
 		db:           db,
 		metricsBatch: make(map[uuid.UUID]*TunnelMetrics),
 		eventQueue:   make(chan *AnalyticsEvent, 10000), // 10k event buffer
-		
+
 		// Default configuration
 		batchSize:       100,
 		batchInterval:   30 * time.Second,
 		queueSize:       10000,
 		retentionPeriod: 30 * 24 * time.Hour, // 30 days
-		
+
 		ctx:    ctx,
 		cancel: cancel,
 	}
-	
+
 	return collector
 }
 
 // Start starts the analytics collector
 func (c *Collector) Start() error {
 	logger.Get().Info("Starting analytics collector")
-	
+
 	// Start event processor
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
 		c.processEvents()
 	}()
-	
+
 	// Start batch processor
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
 		c.processBatches()
 	}()
-	
+
 	// Start cleanup worker
 	c.wg.Add(1)
-	
+
 	logger.Get().Info("Analytics collector started")
 	return nil
 }
@@ -145,19 +145,19 @@ func (c *Collector) Start() error {
 // Stop gracefully stops the analytics collector
 func (c *Collector) Stop() error {
 	logger.Get().Info("Stopping analytics collector")
-	
+
 	// Cancel context
 	c.cancel()
-	
+
 	// Close event queue
 	close(c.eventQueue)
-	
+
 	// Wait for all workers to finish
 	c.wg.Wait()
-	
+
 	// Process any remaining metrics
 	c.processFinalBatch()
-	
+
 	logger.Get().Info("Analytics collector stopped")
 	return nil
 }
@@ -167,12 +167,12 @@ func (c *Collector) RecordEvent(event *AnalyticsEvent) {
 	if event == nil {
 		return
 	}
-	
+
 	// Set timestamp if not provided
 	if event.Timestamp.IsZero() {
 		event.Timestamp = time.Now()
 	}
-	
+
 	// Try to queue event
 	select {
 	case c.eventQueue <- event:
@@ -248,23 +248,23 @@ func (c *Collector) RecordError(tunnelID uuid.UUID, requestID, errorMessage stri
 func (c *Collector) GetTunnelStats(tunnelID uuid.UUID) *TunnelMetrics {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	
+
 	metrics, exists := c.metricsBatch[tunnelID]
 	if !exists {
 		return &TunnelMetrics{
-			TunnelID:      tunnelID,
-			StatusCodes:   make(map[int]int64),
-			Methods:       make(map[string]int64),
-			Paths:         make(map[string]int64),
-			IPs:           make(map[string]int64),
-			UserAgents:    make(map[string]int64),
+			TunnelID:    tunnelID,
+			StatusCodes: make(map[int]int64),
+			Methods:     make(map[string]int64),
+			Paths:       make(map[string]int64),
+			IPs:         make(map[string]int64),
+			UserAgents:  make(map[string]int64),
 		}
 	}
-	
+
 	// Return a copy to avoid race conditions
 	metrics.mutex.RLock()
 	defer metrics.mutex.RUnlock()
-	
+
 	return &TunnelMetrics{
 		TunnelID:          metrics.TunnelID,
 		RequestsCount:     metrics.RequestsCount,
@@ -288,7 +288,7 @@ func (c *Collector) GetTunnelStats(tunnelID uuid.UUID) *TunnelMetrics {
 func (c *Collector) GetCollectorStats() CollectorStats {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	
+
 	return CollectorStats{
 		TotalEvents:     c.totalEvents,
 		EventsProcessed: c.eventsProcessed,
@@ -323,9 +323,9 @@ func (c *Collector) processEvents() {
 			if !ok {
 				return // Channel closed
 			}
-			
+
 			c.processEvent(event)
-			
+
 			c.mutex.Lock()
 			c.eventsProcessed++
 			c.mutex.Unlock()
@@ -349,13 +349,13 @@ func (c *Collector) processEvent(event *AnalyticsEvent) {
 		c.metricsBatch[event.TunnelID] = metrics
 	}
 	c.mutex.Unlock()
-	
+
 	// Update metrics
 	metrics.mutex.Lock()
 	defer metrics.mutex.Unlock()
-	
+
 	metrics.LastActivity = event.Timestamp
-	
+
 	switch event.EventType {
 	case EventTypeRequest:
 		metrics.RequestsCount++
@@ -372,7 +372,7 @@ func (c *Collector) processEvent(event *AnalyticsEvent) {
 		if event.UserAgent != "" {
 			metrics.UserAgents[event.UserAgent]++
 		}
-		
+
 	case EventTypeResponse:
 		metrics.BytesOut += event.BytesOut
 		if event.StatusCode > 0 {
@@ -390,7 +390,7 @@ func (c *Collector) processEvent(event *AnalyticsEvent) {
 				metrics.MaxResponseTime = event.ResponseTime
 			}
 		}
-		
+
 	case EventTypeConnection:
 		metrics.RequestsCount++
 		metrics.BytesIn += event.BytesIn
@@ -398,7 +398,7 @@ func (c *Collector) processEvent(event *AnalyticsEvent) {
 		if event.ClientIP != "" {
 			metrics.IPs[event.ClientIP]++
 		}
-		
+
 	case EventTypeError:
 		metrics.ErrorCount++
 	}
@@ -408,7 +408,7 @@ func (c *Collector) processEvent(event *AnalyticsEvent) {
 func (c *Collector) processBatches() {
 	ticker := time.NewTicker(c.batchInterval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-c.ctx.Done():
@@ -422,21 +422,21 @@ func (c *Collector) processBatches() {
 // saveBatch saves current metrics batch to database
 func (c *Collector) saveBatch() {
 	c.mutex.Lock()
-	
+
 	// Get current batch and create new one
 	currentBatch := c.metricsBatch
 	c.metricsBatch = make(map[uuid.UUID]*TunnelMetrics)
-	
+
 	c.mutex.Unlock()
-	
+
 	if len(currentBatch) == 0 {
 		return
 	}
-	
+
 	// Save to database
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	for tunnelID, metrics := range currentBatch {
 		if err := c.saveMetrics(ctx, metrics); err != nil {
 			logger.WithField("tunnel_id", tunnelID.String()).Errorf("Failed to save analytics for tunnel: %v", err)
@@ -445,11 +445,11 @@ func (c *Collector) saveBatch() {
 			c.mutex.Unlock()
 		}
 	}
-	
+
 	c.mutex.Lock()
 	c.batchesSaved++
 	c.mutex.Unlock()
-	
+
 	logger.WithField("tunnels_saved", len(currentBatch)).Info("Saved analytics batch")
 }
 
@@ -457,24 +457,24 @@ func (c *Collector) saveBatch() {
 func (c *Collector) saveMetrics(ctx context.Context, metrics *TunnelMetrics) error {
 	metrics.mutex.RLock()
 	defer metrics.mutex.RUnlock()
-	
+
 	// Convert UUID to uuid.UUID
 	var pgTunnelID uuid.UUID
 	pgTunnelID.Scan(metrics.TunnelID.String())
-	
+
 	// Calculate average response time
 	var avgResponseTime float32
 	if metrics.RequestsCount > 0 {
 		avgResponseTime = float32(metrics.TotalResponseTime.Milliseconds()) / float32(metrics.RequestsCount)
 	}
-	
+
 	// Convert maps to JSON
 	statusCodesJSON, _ := json.Marshal(metrics.StatusCodes)
 	methodsJSON, _ := json.Marshal(metrics.Methods)
 	pathsJSON, _ := json.Marshal(metrics.Paths)
 	ipsJSON, _ := json.Marshal(metrics.IPs)
 	userAgentsJSON, _ := json.Marshal(metrics.UserAgents)
-	
+
 	// Insert analytics record
 	params := sqlc.CreateTunnelAnalyticsParams{
 		TunnelID:        pgTunnelID,
@@ -485,11 +485,11 @@ func (c *Collector) saveMetrics(ctx context.Context, metrics *TunnelMetrics) err
 		ResponseTimeAvg: pgtype.Float4{Float32: avgResponseTime, Valid: avgResponseTime > 0},
 		ErrorCount:      metrics.ErrorCount,
 	}
-	
-	if _,err := c.db.Queries.CreateTunnelAnalytics(ctx, params); err != nil {
+
+	if _, err := c.db.Queries.CreateTunnelAnalytics(ctx, params); err != nil {
 		return fmt.Errorf("failed to create tunnel analytics: %w", err)
 	}
-	
+
 	// Store additional metrics if needed
 	// TODO: Create separate tables for detailed breakdowns if required
 	_ = statusCodesJSON
@@ -497,7 +497,7 @@ func (c *Collector) saveMetrics(ctx context.Context, metrics *TunnelMetrics) err
 	_ = pathsJSON
 	_ = ipsJSON
 	_ = userAgentsJSON
-	
+
 	return nil
 }
 
@@ -524,4 +524,4 @@ func copyStringMap(original map[string]int64) map[string]int64 {
 		copy[k] = v
 	}
 	return copy
-} 
+}

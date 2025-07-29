@@ -23,43 +23,43 @@ import (
 type HTTPProxy struct {
 	tunnelManager *tunnel.TunnelManager
 	config        *config.Config
-	
+
 	// HTTP servers
 	httpServer  *http.Server
 	httpsServer *http.Server
-	
+
 	// Server control
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
-	
+
 	// Statistics
-	totalRequests    int64
-	totalBytesIn     int64
-	totalBytesOut    int64
-	activeRequests   int32
-	totalErrors      int64
-	
+	totalRequests  int64
+	totalBytesIn   int64
+	totalBytesOut  int64
+	activeRequests int32
+	totalErrors    int64
+
 	mutex sync.RWMutex
 }
 
 // RequestContext holds information about a proxied request
 type RequestContext struct {
-	RequestID    string
-	TunnelID     uuid.UUID
-	Subdomain    string
-	StartTime    time.Time
-	ClientIP     string
-	UserAgent    string
-	Method       string
-	Path         string
+	RequestID     string
+	TunnelID      uuid.UUID
+	Subdomain     string
+	StartTime     time.Time
+	ClientIP      string
+	UserAgent     string
+	Method        string
+	Path          string
 	ContentLength int64
 }
 
 // NewHTTPProxy creates a new HTTP proxy
 func NewHTTPProxy(tunnelManager *tunnel.TunnelManager, config *config.Config) *HTTPProxy {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	return &HTTPProxy{
 		tunnelManager: tunnelManager,
 		config:        config,
@@ -72,7 +72,7 @@ func NewHTTPProxy(tunnelManager *tunnel.TunnelManager, config *config.Config) *H
 func (hp *HTTPProxy) Start() error {
 	// Create HTTP handler
 	handler := http.HandlerFunc(hp.handleHTTPRequest)
-	
+
 	// Start HTTP server (port 80)
 	hp.httpServer = &http.Server{
 		Addr:           fmt.Sprintf(":%d", hp.config.Server.HTTPPort),
@@ -82,7 +82,7 @@ func (hp *HTTPProxy) Start() error {
 		IdleTimeout:    60 * time.Second,
 		MaxHeaderBytes: 1 << 20, // 1MB
 	}
-	
+
 	// Start HTTP server in goroutine
 	hp.wg.Add(1)
 	go func() {
@@ -92,7 +92,7 @@ func (hp *HTTPProxy) Start() error {
 			logger.WithError(err).Error("HTTP proxy server error")
 		}
 	}()
-	
+
 	// Start HTTPS server (port 443) if TLS is configured
 	if hp.config.TLS.CertFile != "" && hp.config.TLS.KeyFile != "" {
 		hp.httpsServer = &http.Server{
@@ -106,7 +106,7 @@ func (hp *HTTPProxy) Start() error {
 				MinVersion: tls.VersionTLS12,
 			},
 		}
-		
+
 		hp.wg.Add(1)
 		go func() {
 			defer hp.wg.Done()
@@ -116,7 +116,7 @@ func (hp *HTTPProxy) Start() error {
 			}
 		}()
 	}
-	
+
 	logger.Get().Info("HTTP proxy servers started")
 	return nil
 }
@@ -124,31 +124,31 @@ func (hp *HTTPProxy) Start() error {
 // Stop gracefully stops the HTTP proxy servers
 func (hp *HTTPProxy) Stop() error {
 	logger.Get().Info("Stopping HTTP proxy servers")
-	
+
 	// Cancel context
 	hp.cancel()
-	
+
 	// Shutdown servers with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	// Shutdown HTTP server
 	if hp.httpServer != nil {
 		if err := hp.httpServer.Shutdown(ctx); err != nil {
 			logger.WithError(err).Error("Error shutting down HTTP server")
 		}
 	}
-	
+
 	// Shutdown HTTPS server
 	if hp.httpsServer != nil {
 		if err := hp.httpsServer.Shutdown(ctx); err != nil {
 			logger.WithError(err).Error("Error shutting down HTTPS server")
 		}
 	}
-	
+
 	// Wait for all goroutines to finish
 	hp.wg.Wait()
-	
+
 	logger.Get().Info("HTTP proxy servers stopped")
 	return nil
 }
@@ -161,13 +161,13 @@ func (hp *HTTPProxy) handleHTTPRequest(w http.ResponseWriter, r *http.Request) {
 	hp.activeRequests++
 	requestID := fmt.Sprintf("req_%d_%d", time.Now().UnixNano(), hp.totalRequests)
 	hp.mutex.Unlock()
-	
+
 	defer func() {
 		hp.mutex.Lock()
 		hp.activeRequests--
 		hp.mutex.Unlock()
 	}()
-	
+
 	// Create request context
 	reqCtx := &RequestContext{
 		RequestID:     requestID,
@@ -178,43 +178,43 @@ func (hp *HTTPProxy) handleHTTPRequest(w http.ResponseWriter, r *http.Request) {
 		Path:          r.URL.Path,
 		ContentLength: r.ContentLength,
 	}
-	
+
 	logger.WithFields(map[string]interface{}{
 		"request_id": reqCtx.RequestID,
 		"method":     reqCtx.Method,
 		"path":       reqCtx.Path,
 		"client_ip":  reqCtx.ClientIP,
 	}).Debug("HTTP request received")
-	
+
 	// Extract subdomain from Host header
 	subdomain, err := hp.extractSubdomain(r.Host)
 	if err != nil {
 		hp.handleError(w, reqCtx, http.StatusBadRequest, "Invalid host header", err)
 		return
 	}
-	
+
 	if subdomain == "" {
 		hp.handleError(w, reqCtx, http.StatusNotFound, "Subdomain not found", fmt.Errorf("no subdomain in host: %s", r.Host))
 		return
 	}
-	
+
 	reqCtx.Subdomain = subdomain
-	
+
 	// Find tunnel by subdomain
 	tunnelObj, err := hp.tunnelManager.GetTunnelBySubdomain(subdomain)
 	if err != nil {
 		hp.handleError(w, reqCtx, http.StatusNotFound, "Tunnel not found", err)
 		return
 	}
-	
+
 	reqCtx.TunnelID = tunnelObj.ID
-	
+
 	// Check tunnel state
 	if tunnelObj.State != tunnel.StateActive {
 		hp.handleError(w, reqCtx, http.StatusServiceUnavailable, "Tunnel not available", fmt.Errorf("tunnel state: %s", tunnelObj.State))
 		return
 	}
-	
+
 	// Read request body
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -222,7 +222,7 @@ func (hp *HTTPProxy) handleHTTPRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	r.Body.Close()
-	
+
 	// Create forward request
 	forwardReq := &tunnel.ForwardRequest{
 		ConnectionID: fmt.Sprintf("conn_%s", requestID),
@@ -233,17 +233,17 @@ func (hp *HTTPProxy) handleHTTPRequest(w http.ResponseWriter, r *http.Request) {
 		Path:         r.URL.RequestURI(),
 		ResponseChan: make(chan *tunnel.ForwardResponse, 1),
 	}
-	
+
 	// Forward request through tunnel
 	response, err := hp.tunnelManager.ForwardRequest(tunnelObj.ID, forwardReq)
 	if err != nil {
 		hp.handleError(w, reqCtx, http.StatusBadGateway, "Failed to forward request", err)
 		return
 	}
-	
+
 	// Handle response
 	hp.handleResponse(w, reqCtx, response)
-	
+
 	// Log completion
 	duration := time.Since(reqCtx.StartTime)
 	logger.WithFields(map[string]interface{}{
@@ -258,37 +258,37 @@ func (hp *HTTPProxy) extractSubdomain(host string) (string, error) {
 	if colonIndex := strings.Index(host, ":"); colonIndex != -1 {
 		host = host[:colonIndex]
 	}
-	
+
 	// Convert to lowercase
 	host = strings.ToLower(host)
-	
+
 	// Check if host matches our domain
 	serverDomain := strings.ToLower(hp.config.Server.Domain)
-	
+
 	// Handle exact domain match (no subdomain)
 	if host == serverDomain {
 		return "", nil
 	}
-	
+
 	// Check if host ends with our domain
 	domainSuffix := "." + serverDomain
 	if !strings.HasSuffix(host, domainSuffix) {
 		return "", fmt.Errorf("host %s does not match domain %s", host, serverDomain)
 	}
-	
+
 	// Extract subdomain
 	subdomain := host[:len(host)-len(domainSuffix)]
-	
+
 	// Validate subdomain
 	if subdomain == "" {
 		return "", nil
 	}
-	
+
 	// Basic subdomain validation
 	if strings.Contains(subdomain, ".") {
 		return "", fmt.Errorf("nested subdomains not supported: %s", subdomain)
 	}
-	
+
 	return subdomain, nil
 }
 
@@ -297,16 +297,16 @@ func (hp *HTTPProxy) handleError(w http.ResponseWriter, reqCtx *RequestContext, 
 	hp.mutex.Lock()
 	hp.totalErrors++
 	hp.mutex.Unlock()
-	
+
 	logger.WithField("request_id", reqCtx.RequestID).WithError(err).Error(message)
-	
+
 	// Set content type
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("X-Shipit-Error", "true")
-	
+
 	// Write status code
 	w.WriteHeader(statusCode)
-	
+
 	// Write error page
 	errorHTML := hp.generateErrorPage(statusCode, message, reqCtx)
 	w.Write([]byte(errorHTML))
@@ -318,19 +318,19 @@ func (hp *HTTPProxy) handleResponse(w http.ResponseWriter, reqCtx *RequestContex
 		hp.handleError(w, reqCtx, http.StatusBadGateway, "Tunnel response error", response.Error)
 		return
 	}
-	
+
 	// Set response headers
 	for key, value := range response.Headers {
 		w.Header().Set(key, value)
 	}
-	
+
 	// Set status code
 	statusCode := response.StatusCode
 	if statusCode == 0 {
 		statusCode = http.StatusOK
 	}
 	w.WriteHeader(statusCode)
-	
+
 	// Write response body
 	if len(response.Data) > 0 {
 		bytesWritten, err := w.Write(response.Data)
@@ -338,7 +338,7 @@ func (hp *HTTPProxy) handleResponse(w http.ResponseWriter, reqCtx *RequestContex
 			logger.WithField("request_id", reqCtx.RequestID).WithError(err).Error("Error writing response")
 			return
 		}
-		
+
 		// Update statistics
 		hp.mutex.Lock()
 		hp.totalBytesIn += int64(len(reqCtx.Path)) // Approximate request size
@@ -386,13 +386,13 @@ func (hp *HTTPProxy) generateErrorPage(statusCode int, message string, reqCtx *R
 func (hp *HTTPProxy) GetStats() HTTPProxyStats {
 	hp.mutex.RLock()
 	defer hp.mutex.RUnlock()
-	
+
 	return HTTPProxyStats{
-		TotalRequests:   hp.totalRequests,
-		ActiveRequests:  hp.activeRequests,
-		TotalBytesIn:    hp.totalBytesIn,
-		TotalBytesOut:   hp.totalBytesOut,
-		TotalErrors:     hp.totalErrors,
+		TotalRequests:  hp.totalRequests,
+		ActiveRequests: hp.activeRequests,
+		TotalBytesIn:   hp.totalBytesIn,
+		TotalBytesOut:  hp.totalBytesOut,
+		TotalErrors:    hp.totalErrors,
 	}
 }
 
@@ -417,12 +417,12 @@ func getClientIP(r *http.Request) string {
 		}
 		return strings.TrimSpace(xff)
 	}
-	
+
 	// Check X-Real-IP header (from nginx)
 	if xri := r.Header.Get("X-Real-IP"); xri != "" {
 		return strings.TrimSpace(xri)
 	}
-	
+
 	// Fall back to remote address
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -482,7 +482,7 @@ func (tt *TunnelTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 		}
 		req.Body.Close()
 	}
-	
+
 	// Create forward request
 	forwardReq := &tunnel.ForwardRequest{
 		ConnectionID: fmt.Sprintf("conn_%d", time.Now().UnixNano()),
@@ -493,17 +493,17 @@ func (tt *TunnelTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 		Path:         req.URL.RequestURI(),
 		ResponseChan: make(chan *tunnel.ForwardResponse, 1),
 	}
-	
+
 	// Forward through tunnel
 	response, err := tt.tunnelManager.ForwardRequest(tt.tunnelID, forwardReq)
 	if err != nil {
 		return nil, fmt.Errorf("tunnel forward failed: %w", err)
 	}
-	
+
 	if response.Error != nil {
 		return nil, fmt.Errorf("tunnel response error: %w", response.Error)
 	}
-	
+
 	// Convert to HTTP response
 	httpResp := &http.Response{
 		StatusCode:    response.StatusCode,
@@ -516,11 +516,11 @@ func (tt *TunnelTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 		ContentLength: int64(len(response.Data)),
 		Request:       req,
 	}
-	
+
 	// Set response headers
 	for key, value := range response.Headers {
 		httpResp.Header.Set(key, value)
 	}
-	
+
 	return httpResp, nil
-} 
+}

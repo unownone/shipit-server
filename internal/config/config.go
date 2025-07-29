@@ -10,18 +10,18 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	Server      ServerConfig      `mapstructure:"server"`
-	TLS         TLSConfig         `mapstructure:"tls"`
-	Auth        AuthConfig        `mapstructure:"auth"`
-	JWT         JWTConfig         `mapstructure:"jwt"`
-	Database    DatabaseConfig    `mapstructure:"database"`
-	Redis       RedisConfig       `mapstructure:"redis"`
-	Tunnels     TunnelsConfig     `mapstructure:"tunnels"`
-	Analytics   AnalyticsConfig   `mapstructure:"analytics"`
-	CORS        CORSConfig        `mapstructure:"cors"`
-	RateLimit   RateLimitConfig   `mapstructure:"rate_limiting"`
-	Logging     LoggingConfig     `mapstructure:"logging"`
-	Secrets     *SecretsConfig    // Loaded separately for security
+	Server    ServerConfig    `mapstructure:"server"`
+	TLS       TLSConfig       `mapstructure:"tls"`
+	Auth      AuthConfig      `mapstructure:"auth"`
+	JWT       JWTConfig       `mapstructure:"jwt"`
+	Database  DatabaseConfig  `mapstructure:"database"`
+	Redis     RedisConfig     `mapstructure:"redis"`
+	Tunnels   TunnelsConfig   `mapstructure:"tunnels"`
+	Analytics AnalyticsConfig `mapstructure:"analytics"`
+	CORS      CORSConfig      `mapstructure:"cors"`
+	RateLimit RateLimitConfig `mapstructure:"rate_limiting"`
+	Logging   LoggingConfig   `mapstructure:"logging"`
+	Secrets   *SecretsConfig  // Loaded separately for security
 }
 
 type ServerConfig struct {
@@ -39,19 +39,19 @@ type TLSConfig struct {
 }
 
 type AuthConfig struct {
-	APIKeyLength       int           `mapstructure:"api_key_length"`
-	HashCost          int           `mapstructure:"hash_cost"`
-	MaxLoginAttempts  int           `mapstructure:"max_login_attempts"`
-	LockoutDuration   time.Duration `mapstructure:"lockout_duration"`
+	APIKeyLength     int           `mapstructure:"api_key_length"`
+	HashCost         int           `mapstructure:"hash_cost"`
+	MaxLoginAttempts int           `mapstructure:"max_login_attempts"`
+	LockoutDuration  time.Duration `mapstructure:"lockout_duration"`
 }
 
 type JWTConfig struct {
-	SecretKey            string        `mapstructure:"secret_key"`
-	Issuer              string        `mapstructure:"issuer"`
-	Audience            string        `mapstructure:"audience"`
-	AccessTokenExpiry   time.Duration `mapstructure:"access_token_expiry"`
-	RefreshTokenExpiry  time.Duration `mapstructure:"refresh_token_expiry"`
-	Algorithm           string        `mapstructure:"algorithm"`
+	SecretKey          string        `mapstructure:"secret_key"`
+	Issuer             string        `mapstructure:"issuer"`
+	Audience           string        `mapstructure:"audience"`
+	AccessTokenExpiry  time.Duration `mapstructure:"access_token_expiry"`
+	RefreshTokenExpiry time.Duration `mapstructure:"refresh_token_expiry"`
+	Algorithm          string        `mapstructure:"algorithm"`
 }
 
 type DatabaseConfig struct {
@@ -103,10 +103,10 @@ type CORSConfig struct {
 }
 
 type RateLimitConfig struct {
-	Enabled                 bool `mapstructure:"enabled"`
-	APIRequestsPerMinute    int  `mapstructure:"api_requests_per_minute"`
-	LoginAttemptsPerHour    int  `mapstructure:"login_attempts_per_hour"`
-	TunnelCreationPerHour   int  `mapstructure:"tunnel_creation_per_hour"`
+	Enabled               bool `mapstructure:"enabled"`
+	APIRequestsPerMinute  int  `mapstructure:"api_requests_per_minute"`
+	LoginAttemptsPerHour  int  `mapstructure:"login_attempts_per_hour"`
+	TunnelCreationPerHour int  `mapstructure:"tunnel_creation_per_hour"`
 }
 
 type LoggingConfig struct {
@@ -124,7 +124,7 @@ func Load(configPath string) (*Config, error) {
 func LoadWithSecrets(configPath, secretsPath string) (*Config, error) {
 	viper.SetConfigName("server")
 	viper.SetConfigType("yaml")
-	
+
 	if configPath != "" {
 		viper.SetConfigFile(configPath)
 	} else {
@@ -319,4 +319,4 @@ func (c *Config) DatabaseDSN() string {
 // RedisAddr returns the Redis address
 func (c *Config) RedisAddr() string {
 	return fmt.Sprintf("%s:%d", c.Redis.Host, c.Redis.Port)
-} 
+}

@@ -20,10 +20,10 @@ import (
 type UserRole string
 
 const (
-	JWTAuthorizationHeader string = "Authorization"
-	RoleUser      UserRole = "user"
-	RoleAdmin     UserRole = "admin"
-	RoleModerator UserRole = "moderator"
+	JWTAuthorizationHeader string   = "Authorization"
+	RoleUser               UserRole = "user"
+	RoleAdmin              UserRole = "admin"
+	RoleModerator          UserRole = "moderator"
 )
 
 // JWTClaims represents the claims stored in a JWT token
@@ -39,16 +39,16 @@ type JWTClaims struct {
 // JWT access tokens are stateless and never stored in database
 // Only refresh tokens are stored for secure token refresh
 type JWTManager struct {
-	config *config.JWTConfig
-	db     *database.Database
+	config     *config.JWTConfig
+	db         *database.Database
 	AuthHeader string
 }
 
 // NewJWTManager creates a new JWT manager
 func NewJWTManager(cfg *config.JWTConfig, db *database.Database) *JWTManager {
 	return &JWTManager{
-		config: cfg,
-		db:     db,
+		config:     cfg,
+		db:         db,
 		AuthHeader: JWTAuthorizationHeader,
 	}
 }

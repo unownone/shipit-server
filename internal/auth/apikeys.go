@@ -18,20 +18,20 @@ import (
 
 const (
 	APIKeyAuthorizationHeader string = "X-API-KEY" // API KEY HEADER
-	APIKeyPrefix = "shipit_" // 7 bytes
-	APIKeyLength = 32 // Length of the random part
+	APIKeyPrefix                     = "shipit_"   // 7 bytes
+	APIKeyLength                     = 32          // Length of the random part
 )
 
 // APIKeyManager handles API key generation, validation, and management
 type APIKeyManager struct {
-	db *database.Database
+	db         *database.Database
 	AuthHeader string
 }
 
 // NewAPIKeyManager creates a new API key manager
 func NewAPIKeyManager(db *database.Database) *APIKeyManager {
 	return &APIKeyManager{
-		db: db,
+		db:         db,
 		AuthHeader: APIKeyAuthorizationHeader,
 	}
 }
@@ -190,4 +190,4 @@ func (akm *APIKeyManager) CleanupExpiredKeys(ctx context.Context) error {
 func (akm *APIKeyManager) UpdateAPIKeyName(ctx context.Context, keyID, userID uuid.UUID, newName string) error {
 	// This would need a custom SQL query to be added to the queries
 	return fmt.Errorf("update API key name not implemented - needs custom SQL query")
-} 
+}

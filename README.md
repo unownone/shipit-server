@@ -1,5 +1,8 @@
 # ShipIt Server
 
+[![CI/CD Pipeline](https://github.com/unwonone/shipit-server/workflows/CI/CD%20Pipeline/badge.svg)](https://github.com/unwonone/shipit-server/actions)
+[![Coverage](https://codecov.io/gh/unwonone/shipit-server/branch/main/graph/badge.svg)](https://codecov.io/gh/unwonone/shipit-server)
+
 A secure, high-performance tunneling server that creates secure tunnels to expose local services to the internet. Supports both HTTP and TCP tunneling with comprehensive authentication, analytics, and management capabilities.
 
 ## Features

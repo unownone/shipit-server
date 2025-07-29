@@ -24,21 +24,21 @@ type AgentListener struct {
 	db            *database.Database
 	config        *config.Config
 	tlsConfig     *tls.Config
-	
+
 	// Connection management
 	connections map[string]*AgentSession
 	mutex       sync.RWMutex
-	
+
 	// Server control
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
-	
+
 	// Statistics
-	totalConnections    int64
-	activeConnections   int32
-	totalDataBytes      int64
-	messagesProcessed   int64
+	totalConnections  int64
+	activeConnections int32
+	totalDataBytes    int64
+	messagesProcessed int64
 }
 
 // AgentSession represents an active session with a client agent
@@ -52,11 +52,11 @@ type AgentSession struct {
 	CreatedAt     time.Time
 	LastHeartbeat time.Time
 	IsActive      bool
-	
+
 	// Message channels
 	incomingChan chan *Message
 	outgoingChan chan *Message
-	
+
 	// Session control
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -67,7 +67,7 @@ type AgentSession struct {
 // NewAgentListener creates a new agent listener
 func NewAgentListener(tunnelManager *tunnel.TunnelManager, db *database.Database, config *config.Config) *AgentListener {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	return &AgentListener{
 		tunnelManager: tunnelManager,
 		db:            db,
@@ -86,39 +86,39 @@ func (al *AgentListener) Start() error {
 		return fmt.Errorf("failed to setup TLS: %w", err)
 	}
 	al.tlsConfig = tlsConfig
-	
+
 	// Create listener
 	addr := fmt.Sprintf(":%d", al.config.Server.AgentPort)
 	listener, err := tls.Listen("tcp", addr, tlsConfig)
 	if err != nil {
 		return fmt.Errorf("failed to start agent listener on %s: %w", addr, err)
 	}
-	
+
 	al.listener = listener
 	logger.WithField("port", al.config.Server.AgentPort).Info("Agent listener started")
-	
+
 	// Start accepting connections
 	al.wg.Add(1)
 	go func() {
 		defer al.wg.Done()
 		al.acceptConnections()
 	}()
-	
+
 	return nil
 }
 
 // Stop gracefully stops the agent listener
 func (al *AgentListener) Stop() error {
 	logger.Get().Info("Stopping agent listener")
-	
+
 	// Cancel context to stop all goroutines
 	al.cancel()
-	
+
 	// Close listener
 	if al.listener != nil {
 		al.listener.Close()
 	}
-	
+
 	// Close all active sessions
 	al.mutex.Lock()
 	for _, session := range al.connections {
@@ -126,10 +126,10 @@ func (al *AgentListener) Stop() error {
 	}
 	al.connections = make(map[string]*AgentSession)
 	al.mutex.Unlock()
-	
+
 	// Wait for all goroutines to finish
 	al.wg.Wait()
-	
+
 	logger.Get().Info("Agent listener stopped")
 	return nil
 }
@@ -145,7 +145,7 @@ func (al *AgentListener) acceptConnections() {
 			if tcpListener, ok := al.listener.(*net.TCPListener); ok {
 				tcpListener.SetDeadline(time.Now().Add(1 * time.Second))
 			}
-			
+
 			conn, err := al.listener.Accept()
 			if err != nil {
 				// Check if it's a timeout or if we're shutting down
@@ -159,7 +159,7 @@ func (al *AgentListener) acceptConnections() {
 				logger.WithError(err).Error("Error accepting connection")
 				continue
 			}
-			
+
 			// Handle connection in goroutine
 			al.wg.Add(1)
 			go func() {
@@ -173,24 +173,24 @@ func (al *AgentListener) acceptConnections() {
 // handleConnection handles a new agent connection
 func (al *AgentListener) handleConnection(conn net.Conn) {
 	defer conn.Close()
-	
+
 	// Update statistics
 	al.mutex.Lock()
 	al.totalConnections++
 	al.activeConnections++
 	al.mutex.Unlock()
-	
+
 	defer func() {
 		al.mutex.Lock()
 		al.activeConnections--
 		al.mutex.Unlock()
 	}()
-	
+
 	logger.WithField("remote_addr", conn.RemoteAddr()).Info("New agent connection")
-	
+
 	// Set initial read timeout for tunnel registration
 	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
-	
+
 	// Read tunnel registration message
 	msg, err := ReadMessage(conn)
 	if err != nil {
@@ -198,13 +198,13 @@ func (al *AgentListener) handleConnection(conn net.Conn) {
 		al.sendErrorMessage(conn, uuid.Nil, "PROTOCOL_ERROR", "Failed to read registration message")
 		return
 	}
-	
+
 	if msg.Type != MessageTypeTunnelRegistration {
 		logger.WithField("expected_type", MessageTypeTunnelRegistration).WithField("got_type", msg.Type).Error("Expected tunnel registration, got unexpected message type")
 		al.sendErrorMessage(conn, msg.TunnelID, "INVALID_MESSAGE_TYPE", "Expected tunnel registration")
 		return
 	}
-	
+
 	// Parse registration payload
 	var regPayload TunnelRegistrationPayload
 	if err := json.Unmarshal(msg.Payload, &regPayload); err != nil {
@@ -212,7 +212,7 @@ func (al *AgentListener) handleConnection(conn net.Conn) {
 		al.sendErrorMessage(conn, msg.TunnelID, "INVALID_PAYLOAD", "Failed to parse registration payload")
 		return
 	}
-	
+
 	// Validate tunnel exists and user has access
 	_, err = al.validateTunnelAccess(al.ctx, msg.TunnelID, &regPayload)
 	if err != nil {
@@ -220,7 +220,7 @@ func (al *AgentListener) handleConnection(conn net.Conn) {
 		al.sendErrorMessage(conn, msg.TunnelID, "TUNNEL_VALIDATION_FAILED", err.Error())
 		return
 	}
-	
+
 	// Register tunnel with tunnel manager
 	managedTunnel, err := al.tunnelManager.RegisterTunnel(al.ctx, msg.TunnelID)
 	if err != nil {
@@ -228,7 +228,7 @@ func (al *AgentListener) handleConnection(conn net.Conn) {
 		al.sendErrorMessage(conn, msg.TunnelID, "TUNNEL_REGISTRATION_FAILED", err.Error())
 		return
 	}
-	
+
 	// Add connection to tunnel pool
 	agentConn, err := al.tunnelManager.AddConnection(msg.TunnelID, conn)
 	if err != nil {
@@ -236,15 +236,15 @@ func (al *AgentListener) handleConnection(conn net.Conn) {
 		al.sendErrorMessage(conn, msg.TunnelID, "CONNECTION_POOL_FULL", err.Error())
 		return
 	}
-	
+
 	// Create agent session
 	session := al.createAgentSession(msg.TunnelID, conn, managedTunnel, agentConn, &regPayload)
-	
+
 	// Register session
 	al.mutex.Lock()
 	al.connections[session.ID] = session
 	al.mutex.Unlock()
-	
+
 	// Send acknowledgment
 	ackPayload := AcknowledgePayload{
 		MessageType: MessageTypeTunnelRegistration,
@@ -256,23 +256,23 @@ func (al *AgentListener) handleConnection(conn net.Conn) {
 		session.close()
 		return
 	}
-	
+
 	logger.WithField("session_id", session.ID).WithField("tunnel_id", msg.TunnelID).Info("Agent session established")
-	
+
 	// Start session handler
 	session.start()
-	
+
 	// Wait for session to complete
 	<-session.ctx.Done()
-	
+
 	// Cleanup
 	al.mutex.Lock()
 	delete(al.connections, session.ID)
 	al.mutex.Unlock()
-	
+
 	// Remove connection from tunnel pool
 	al.tunnelManager.RemoveConnection(msg.TunnelID, agentConn.ID)
-	
+
 	logger.WithField("session_id", session.ID).Info("Agent session closed")
 }
 
@@ -281,27 +281,27 @@ func (al *AgentListener) validateTunnelAccess(ctx context.Context, tunnelID uuid
 	// Get tunnel from database to verify it exists
 	var pgTunnelID uuid.UUID
 	pgTunnelID.Scan(tunnelID.String())
-	
+
 	dbTunnel, err := al.db.Queries.GetTunnelByID(ctx, pgTunnelID)
 	if err != nil {
 		return nil, fmt.Errorf("tunnel not found: %w", err)
 	}
-	
+
 	// Verify tunnel is active
 	if dbTunnel.Status != "active" {
 		return nil, fmt.Errorf("tunnel is not active (status: %s)", dbTunnel.Status)
 	}
-	
+
 	// Verify protocol matches
 	if regPayload.Protocol != dbTunnel.Protocol {
 		return nil, fmt.Errorf("protocol mismatch: expected %s, got %s", dbTunnel.Protocol, regPayload.Protocol)
 	}
-	
+
 	// Verify target port matches
 	if regPayload.LocalPort != dbTunnel.TargetPort {
 		return nil, fmt.Errorf("target port mismatch: expected %d, got %d", dbTunnel.TargetPort, regPayload.LocalPort)
 	}
-	
+
 	// Create tunnel object for validation
 	tunnel := &tunnel.Tunnel{
 		ID:         tunnelID,
@@ -310,14 +310,14 @@ func (al *AgentListener) validateTunnelAccess(ctx context.Context, tunnelID uuid
 		TargetHost: dbTunnel.TargetHost,
 		TargetPort: dbTunnel.TargetPort,
 	}
-	
+
 	return tunnel, nil
 }
 
 // createAgentSession creates a new agent session
 func (al *AgentListener) createAgentSession(tunnelID uuid.UUID, conn net.Conn, managedTunnel *tunnel.Tunnel, agentConn *tunnel.AgentConnection, regPayload *TunnelRegistrationPayload) *AgentSession {
 	ctx, cancel := context.WithCancel(al.ctx)
-	
+
 	session := &AgentSession{
 		ID:            agentConn.ID,
 		TunnelID:      tunnelID,
@@ -333,7 +333,7 @@ func (al *AgentListener) createAgentSession(tunnelID uuid.UUID, conn net.Conn, m
 		ctx:           ctx,
 		cancel:        cancel,
 	}
-	
+
 	return session
 }
 
@@ -343,14 +343,14 @@ func (al *AgentListener) sendErrorMessage(conn net.Conn, tunnelID uuid.UUID, cod
 		Code:    code,
 		Message: message,
 	}
-	
+
 	payload, _ := json.Marshal(errorPayload)
 	msg := &Message{
 		Type:     MessageTypeError,
 		TunnelID: tunnelID,
 		Payload:  payload,
 	}
-	
+
 	WriteMessage(conn, msg)
 }
 
@@ -360,13 +360,13 @@ func (al *AgentListener) sendAcknowledgment(conn net.Conn, tunnelID uuid.UUID, a
 	if err != nil {
 		return fmt.Errorf("failed to marshal acknowledgment: %w", err)
 	}
-	
+
 	msg := &Message{
 		Type:     MessageTypeAcknowledge,
 		TunnelID: tunnelID,
 		Payload:  payload,
 	}
-	
+
 	return WriteMessage(conn, msg)
 }
 
@@ -382,7 +382,7 @@ func (al *AgentListener) setupTLS() (*tls.Config, error) {
 			return nil, fmt.Errorf("failed to generate self-signed certificate: %w", err)
 		}
 	}
-	
+
 	return &tls.Config{
 		Certificates: []tls.Certificate{cert},
 		ServerName:   al.config.Server.Domain,
@@ -401,23 +401,23 @@ func (al *AgentListener) generateSelfSignedCert() (tls.Certificate, error) {
 func (al *AgentListener) GetStats() AgentListenerStats {
 	al.mutex.RLock()
 	defer al.mutex.RUnlock()
-	
+
 	return AgentListenerStats{
-		TotalConnections:   al.totalConnections,
-		ActiveConnections:  al.activeConnections,
-		ActiveSessions:     int32(len(al.connections)),
-		TotalDataBytes:     al.totalDataBytes,
-		MessagesProcessed:  al.messagesProcessed,
+		TotalConnections:  al.totalConnections,
+		ActiveConnections: al.activeConnections,
+		ActiveSessions:    int32(len(al.connections)),
+		TotalDataBytes:    al.totalDataBytes,
+		MessagesProcessed: al.messagesProcessed,
 	}
 }
 
 // AgentListenerStats represents statistics for the agent listener
 type AgentListenerStats struct {
-	TotalConnections   int64
-	ActiveConnections  int32
-	ActiveSessions     int32
-	TotalDataBytes     int64
-	MessagesProcessed  int64
+	TotalConnections  int64
+	ActiveConnections int32
+	ActiveSessions    int32
+	TotalDataBytes    int64
+	MessagesProcessed int64
 }
 
 // AgentSession methods
@@ -430,21 +430,21 @@ func (as *AgentSession) start() {
 		defer as.wg.Done()
 		as.messageReader()
 	}()
-	
+
 	// Start message writer
 	as.wg.Add(1)
 	go func() {
 		defer as.wg.Done()
 		as.messageWriter()
 	}()
-	
+
 	// Start message processor
 	as.wg.Add(1)
 	go func() {
 		defer as.wg.Done()
 		as.messageProcessor()
 	}()
-	
+
 	// Start heartbeat monitor
 	as.wg.Add(1)
 	go func() {
@@ -462,7 +462,7 @@ func (as *AgentSession) close() {
 	}
 	as.IsActive = false
 	as.mutex.Unlock()
-	
+
 	as.cancel()
 	as.Conn.Close()
 	close(as.incomingChan)
@@ -472,7 +472,7 @@ func (as *AgentSession) close() {
 // messageReader reads messages from the connection
 func (as *AgentSession) messageReader() {
 	defer as.close()
-	
+
 	for {
 		select {
 		case <-as.ctx.Done():
@@ -480,7 +480,7 @@ func (as *AgentSession) messageReader() {
 		default:
 			// Set read timeout
 			as.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-			
+
 			msg, err := ReadMessage(as.Conn)
 			if err != nil {
 				if as.ctx.Err() == nil {
@@ -488,7 +488,7 @@ func (as *AgentSession) messageReader() {
 				}
 				return
 			}
-			
+
 			select {
 			case as.incomingChan <- msg:
 			case <-as.ctx.Done():
@@ -501,7 +501,7 @@ func (as *AgentSession) messageReader() {
 // messageWriter writes messages to the connection
 func (as *AgentSession) messageWriter() {
 	defer as.close()
-	
+
 	for {
 		select {
 		case <-as.ctx.Done():
@@ -510,10 +510,10 @@ func (as *AgentSession) messageWriter() {
 			if msg == nil {
 				return
 			}
-			
+
 			// Set write timeout
 			as.Conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
-			
+
 			if err := WriteMessage(as.Conn, msg); err != nil {
 				if as.ctx.Err() == nil {
 					logger.WithError(err).WithField("session_id", as.ID).Error("Failed to write message")
@@ -527,7 +527,7 @@ func (as *AgentSession) messageWriter() {
 // messageProcessor processes incoming messages
 func (as *AgentSession) messageProcessor() {
 	defer as.close()
-	
+
 	for {
 		select {
 		case <-as.ctx.Done():
@@ -536,7 +536,7 @@ func (as *AgentSession) messageProcessor() {
 			if msg == nil {
 				return
 			}
-			
+
 			if err := as.processMessage(msg); err != nil {
 				logger.WithError(err).WithField("session_id", as.ID).Error("Failed to process message")
 				return
@@ -565,31 +565,31 @@ func (as *AgentSession) handleHeartbeat(msg *Message) error {
 	as.mutex.Lock()
 	as.LastHeartbeat = time.Now()
 	as.mutex.Unlock()
-	
+
 	// Parse heartbeat payload
 	var heartbeat HeartbeatPayload
 	if err := json.Unmarshal(msg.Payload, &heartbeat); err != nil {
 		return fmt.Errorf("failed to parse heartbeat: %w", err)
 	}
-	
+
 	// Send heartbeat response
 	response := HeartbeatPayload{
 		Timestamp: time.Now().Unix(),
 	}
-	
+
 	payload, _ := json.Marshal(response)
 	responseMsg := &Message{
 		Type:     MessageTypeHeartbeat,
 		TunnelID: msg.TunnelID,
 		Payload:  payload,
 	}
-	
+
 	select {
 	case as.outgoingChan <- responseMsg:
 	case <-as.ctx.Done():
 		return as.ctx.Err()
 	}
-	
+
 	return nil
 }
 
@@ -613,7 +613,7 @@ func (as *AgentSession) handleConnectionClose(msg *Message) error {
 func (as *AgentSession) heartbeatMonitor() {
 	ticker := time.NewTicker(60 * time.Second) // Check every minute
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-as.ctx.Done():
@@ -622,7 +622,7 @@ func (as *AgentSession) heartbeatMonitor() {
 			as.mutex.RLock()
 			lastHeartbeat := as.LastHeartbeat
 			as.mutex.RUnlock()
-			
+
 			// Check if heartbeat is overdue (2 minutes without heartbeat)
 			if time.Since(lastHeartbeat) > 2*time.Minute {
 				logger.WithField("session_id", as.ID).Warn("Heartbeat timeout, closing session")
@@ -631,4 +631,4 @@ func (as *AgentSession) heartbeatMonitor() {
 			}
 		}
 	}
-} 
+}

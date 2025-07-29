@@ -33,7 +33,7 @@ INSERT INTO api_keys (
 `
 
 type CreateAPIKeyParams struct {
-	UserID    uuid.UUID        `db:"user_id" json:"user_id"`
+	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
 	Name      string             `db:"name" json:"name"`
 	Prefix    string             `db:"prefix" json:"prefix"`
 	Hash      string             `db:"hash" json:"hash"`
@@ -85,8 +85,8 @@ WHERE ak.hash = $1 AND ak.is_active = true AND u.is_active = true
 `
 
 type GetAPIKeyByHashRow struct {
-	ID         uuid.UUID        `db:"id" json:"id"`
-	UserID     uuid.UUID        `db:"user_id" json:"user_id"`
+	ID         uuid.UUID          `db:"id" json:"id"`
+	UserID     uuid.UUID          `db:"user_id" json:"user_id"`
 	Name       string             `db:"name" json:"name"`
 	Prefix     string             `db:"prefix" json:"prefix"`
 	Hash       string             `db:"hash" json:"hash"`
@@ -96,7 +96,7 @@ type GetAPIKeyByHashRow struct {
 	Scopes     []string           `db:"scopes" json:"scopes"`
 	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	UserID_2   uuid.UUID        `db:"user_id_2" json:"user_id_2"`
+	UserID_2   uuid.UUID          `db:"user_id_2" json:"user_id_2"`
 	Email      string             `db:"email" json:"email"`
 	UserName   string             `db:"user_name" json:"user_name"`
 	Role       string             `db:"role" json:"role"`
@@ -159,8 +159,8 @@ ORDER BY created_at DESC
 `
 
 type ListAPIKeysByUserRow struct {
-	ID         uuid.UUID        `db:"id" json:"id"`
-	UserID     uuid.UUID        `db:"user_id" json:"user_id"`
+	ID         uuid.UUID          `db:"id" json:"id"`
+	UserID     uuid.UUID          `db:"user_id" json:"user_id"`
 	Name       string             `db:"name" json:"name"`
 	Prefix     string             `db:"prefix" json:"prefix"`
 	IsActive   bool               `db:"is_active" json:"is_active"`

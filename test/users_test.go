@@ -112,7 +112,7 @@ func (s *UsersTestSuite) TestUpdateProfile() {
 				"email": "invalid-email",
 			},
 			expectedStatus: 400,
-			expectedError: "Invalid email",
+			expectedError:  "Invalid email",
 		},
 		{
 			name: "update with duplicate email",
@@ -121,7 +121,7 @@ func (s *UsersTestSuite) TestUpdateProfile() {
 				"email": "test2@example.com", // Use hardcoded email instead of s.TestUser2.Email
 			},
 			expectedStatus: 409,
-			expectedError: "Email is already taken",
+			expectedError:  "Email is already taken",
 		},
 		{
 			name:           "update without authentication",
@@ -140,7 +140,7 @@ func (s *UsersTestSuite) TestUpdateProfile() {
 				// Create second user for duplicate email test
 				hashedPassword, err := s.PasswordManager.HashPassword("testpassword123")
 				require.NoError(s.T(), err)
-				
+
 				_, err = s.DB.Queries.CreateUser(ctx, sqlc.CreateUserParams{
 					Email:         "test2@example.com",
 					PasswordHash:  hashedPassword,
@@ -151,7 +151,7 @@ func (s *UsersTestSuite) TestUpdateProfile() {
 				})
 				require.NoError(s.T(), err)
 			}
-			
+
 			var resp *APIResponse
 			if test.user != nil {
 				resp = s.MakeAuthenticatedRequest("PUT", "/api/v1/users/profile", test.payload, test.user)
@@ -163,7 +163,7 @@ func (s *UsersTestSuite) TestUpdateProfile() {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
 				if userData, exists := resp.Body["user"]; exists {
 					user := userData.(map[string]interface{})
-					
+
 					if name, ok := test.payload["name"]; ok {
 						assert.Equal(s.T(), name, user["name"])
 					}
@@ -294,7 +294,7 @@ func (s *UsersTestSuite) TestRevokeAPIKey() {
 		"name": "Key To Revoke",
 	}, s.TestUser)
 	assert.Equal(s.T(), 201, createResp.StatusCode)
-	
+
 	// Extract the key ID from the response
 	apiKeyData := createResp.Body["api_key"].(map[string]interface{})
 	keyID := apiKeyData["id"].(string)
@@ -349,4 +349,4 @@ func (s *UsersTestSuite) TestRevokeAPIKey() {
 
 func TestUsersTestSuite(t *testing.T) {
 	suite.Run(t, new(UsersTestSuite))
-} 
+}

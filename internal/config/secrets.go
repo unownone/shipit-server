@@ -34,9 +34,9 @@ type APISecrets struct {
 }
 
 type ExternalSecrets struct {
-	StripeSecretKey    string `mapstructure:"stripe_secret_key"`
-	SendGridAPIKey     string `mapstructure:"sendgrid_api_key"`
-	CloudflareAPIKey   string `mapstructure:"cloudflare_api_key"`
+	StripeSecretKey  string `mapstructure:"stripe_secret_key"`
+	SendGridAPIKey   string `mapstructure:"sendgrid_api_key"`
+	CloudflareAPIKey string `mapstructure:"cloudflare_api_key"`
 }
 
 type TLSSecrets struct {
@@ -54,10 +54,10 @@ type AdminSecrets struct {
 func LoadSecrets(secretsPath string) (*SecretsConfig, error) {
 	// Create a separate viper instance for secrets
 	secretsViper := viper.New()
-	
+
 	secretsViper.SetConfigName("secrets")
 	secretsViper.SetConfigType("yaml")
-	
+
 	if secretsPath != "" {
 		secretsViper.SetConfigFile(secretsPath)
 	} else {
@@ -120,16 +120,16 @@ func setSecretsDefaults(v *viper.Viper) {
 func overrideFromDockerSecrets(secrets *SecretsConfig) {
 	// Primary: Environment variables (preferred method)
 	envOverrides := map[string]*string{
-		"SHIPIT_SECRET_DATABASE_PASSWORD":    &secrets.Database.Password,
-		"SHIPIT_SECRET_JWT_SECRET_KEY":       &secrets.JWT.SecretKey,
-		"SHIPIT_SECRET_JWT_REFRESH_SECRET":   &secrets.JWT.RefreshSecret,
-		"SHIPIT_SECRET_ADMIN_EMAIL":          &secrets.Admin.Email,
-		"SHIPIT_SECRET_ADMIN_PASSWORD":       &secrets.Admin.Password,
+		"SHIPIT_SECRET_DATABASE_PASSWORD":     &secrets.Database.Password,
+		"SHIPIT_SECRET_JWT_SECRET_KEY":        &secrets.JWT.SecretKey,
+		"SHIPIT_SECRET_JWT_REFRESH_SECRET":    &secrets.JWT.RefreshSecret,
+		"SHIPIT_SECRET_ADMIN_EMAIL":           &secrets.Admin.Email,
+		"SHIPIT_SECRET_ADMIN_PASSWORD":        &secrets.Admin.Password,
 		"SHIPIT_SECRET_API_RATE_LIMIT_SECRET": &secrets.API.RateLimitSecret,
-		"SHIPIT_SECRET_WEBHOOK_SECRET":       &secrets.API.WebhookSecret,
-		"SHIPIT_SECRET_STRIPE_SECRET_KEY":    &secrets.External.StripeSecretKey,
-		"SHIPIT_SECRET_SENDGRID_API_KEY":     &secrets.External.SendGridAPIKey,
-		"SHIPIT_SECRET_CLOUDFLARE_API_KEY":   &secrets.External.CloudflareAPIKey,
+		"SHIPIT_SECRET_WEBHOOK_SECRET":        &secrets.API.WebhookSecret,
+		"SHIPIT_SECRET_STRIPE_SECRET_KEY":     &secrets.External.StripeSecretKey,
+		"SHIPIT_SECRET_SENDGRID_API_KEY":      &secrets.External.SendGridAPIKey,
+		"SHIPIT_SECRET_CLOUDFLARE_API_KEY":    &secrets.External.CloudflareAPIKey,
 	}
 
 	for envVar, target := range envOverrides {
@@ -140,13 +140,13 @@ func overrideFromDockerSecrets(secrets *SecretsConfig) {
 
 	// Fallback: Docker secrets files (for legacy compatibility)
 	secretFiles := map[string]*string{
-		"/run/secrets/database_password":    &secrets.Database.Password,
-		"/run/secrets/jwt_secret_key":       &secrets.JWT.SecretKey,
-		"/run/secrets/jwt_refresh_secret":   &secrets.JWT.RefreshSecret,
-		"/run/secrets/admin_password":       &secrets.Admin.Password,
-		"/run/secrets/stripe_secret_key":    &secrets.External.StripeSecretKey,
-		"/run/secrets/sendgrid_api_key":     &secrets.External.SendGridAPIKey,
-		"/run/secrets/cloudflare_api_key":   &secrets.External.CloudflareAPIKey,
+		"/run/secrets/database_password":  &secrets.Database.Password,
+		"/run/secrets/jwt_secret_key":     &secrets.JWT.SecretKey,
+		"/run/secrets/jwt_refresh_secret": &secrets.JWT.RefreshSecret,
+		"/run/secrets/admin_password":     &secrets.Admin.Password,
+		"/run/secrets/stripe_secret_key":  &secrets.External.StripeSecretKey,
+		"/run/secrets/sendgrid_api_key":   &secrets.External.SendGridAPIKey,
+		"/run/secrets/cloudflare_api_key": &secrets.External.CloudflareAPIKey,
 	}
 
 	// Only read from files if environment variables are not set
@@ -217,7 +217,7 @@ func (s *SecretsConfig) GetSecretValue(key string) string {
 
 // IsProductionSecrets returns true if secrets are configured for production
 func (s *SecretsConfig) IsProductionSecrets() bool {
-	return !strings.Contains(s.JWT.SecretKey, "dev-") && 
-		   s.Database.Password != "shipit_dev_password" &&
-		   s.Admin.Password != "admin123456"
-} 
+	return !strings.Contains(s.JWT.SecretKey, "dev-") &&
+		s.Database.Password != "shipit_dev_password" &&
+		s.Admin.Password != "admin123456"
+}

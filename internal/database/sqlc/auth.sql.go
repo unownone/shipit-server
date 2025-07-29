@@ -76,7 +76,7 @@ INSERT INTO refresh_tokens (
 `
 
 type CreateRefreshTokenParams struct {
-	UserID    uuid.UUID        `db:"user_id" json:"user_id"`
+	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
 	TokenHash string             `db:"token_hash" json:"token_hash"`
 	ExpiresAt pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 }
@@ -104,7 +104,7 @@ INSERT INTO user_sessions (
 `
 
 type CreateUserSessionParams struct {
-	UserID       uuid.UUID        `db:"user_id" json:"user_id"`
+	UserID       uuid.UUID          `db:"user_id" json:"user_id"`
 	SessionToken string             `db:"session_token" json:"session_token"`
 	IpAddress    *netip.Addr        `db:"ip_address" json:"ip_address"`
 	UserAgent    pgtype.Text        `db:"user_agent" json:"user_agent"`
@@ -208,13 +208,13 @@ WHERE rt.token_hash = $1 AND rt.is_revoked = false AND rt.expires_at > NOW() AND
 `
 
 type GetRefreshTokenRow struct {
-	ID         uuid.UUID        `db:"id" json:"id"`
-	UserID     uuid.UUID        `db:"user_id" json:"user_id"`
+	ID         uuid.UUID          `db:"id" json:"id"`
+	UserID     uuid.UUID          `db:"user_id" json:"user_id"`
 	TokenHash  string             `db:"token_hash" json:"token_hash"`
 	IsRevoked  bool               `db:"is_revoked" json:"is_revoked"`
 	ExpiresAt  pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UserID_2   uuid.UUID        `db:"user_id_2" json:"user_id_2"`
+	UserID_2   uuid.UUID          `db:"user_id_2" json:"user_id_2"`
 	Email      string             `db:"email" json:"email"`
 	Name       string             `db:"name" json:"name"`
 	Role       string             `db:"role" json:"role"`
@@ -248,8 +248,8 @@ WHERE us.session_token = $1 AND us.is_active = true AND us.expires_at > NOW() AN
 `
 
 type GetUserSessionRow struct {
-	ID           uuid.UUID        `db:"id" json:"id"`
-	UserID       uuid.UUID        `db:"user_id" json:"user_id"`
+	ID           uuid.UUID          `db:"id" json:"id"`
+	UserID       uuid.UUID          `db:"user_id" json:"user_id"`
 	SessionToken string             `db:"session_token" json:"session_token"`
 	IpAddress    *netip.Addr        `db:"ip_address" json:"ip_address"`
 	UserAgent    pgtype.Text        `db:"user_agent" json:"user_agent"`
@@ -257,7 +257,7 @@ type GetUserSessionRow struct {
 	ExpiresAt    pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	UserID_2     uuid.UUID        `db:"user_id_2" json:"user_id_2"`
+	UserID_2     uuid.UUID          `db:"user_id_2" json:"user_id_2"`
 	Email        string             `db:"email" json:"email"`
 	Name         string             `db:"name" json:"name"`
 	Role         string             `db:"role" json:"role"`

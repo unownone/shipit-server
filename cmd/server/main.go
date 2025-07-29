@@ -50,7 +50,7 @@ func main() {
 	// Initialize logger first
 	logger.Init()
 	log := logger.Get()
-	
+
 	// Load configuration with secrets
 	configPath := os.Getenv("SHIPIT_CONFIG_PATH")
 	secretsPath := os.Getenv("SHIPIT_SECRETS_PATH")
@@ -119,7 +119,7 @@ func main() {
 	}
 
 	log.WithField("port", cfg.Server.HTTPPort).Info("Starting server")
-	
+
 	if cfg.Server.Environment != "production" {
 		log.WithField("swagger_url", fmt.Sprintf("http://localhost:%d/swagger/index.html", cfg.Server.HTTPPort)).
 			Info("Swagger documentation available")
@@ -202,11 +202,11 @@ func initializeFirstAdmin(db *database.Database, passwordManager *auth.PasswordM
 	}
 
 	log.WithFields(map[string]interface{}{
-		"email": adminUser.Email,
+		"email":   adminUser.Email,
 		"user_id": adminUser.ID.String(),
 	}).Info("Created admin user")
-	
+
 	log.WithField("password", cfg.Secrets.Admin.Password).Warn("Admin password set - please change after first login")
 
 	return nil
-} 
+}

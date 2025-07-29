@@ -68,14 +68,14 @@ INSERT INTO tunnels (
 `
 
 type CreateTunnelParams struct {
-	UserID         uuid.UUID        `db:"user_id" json:"user_id"`
+	UserID         uuid.UUID          `db:"user_id" json:"user_id"`
 	Name           string             `db:"name" json:"name"`
 	Protocol       string             `db:"protocol" json:"protocol"`
 	Subdomain      pgtype.Text        `db:"subdomain" json:"subdomain"`
 	CustomDomain   pgtype.Text        `db:"custom_domain" json:"custom_domain"`
 	TargetHost     string             `db:"target_host" json:"target_host"`
 	TargetPort     int32              `db:"target_port" json:"target_port"`
-	PublicPort     *int32              `db:"public_port" json:"public_port,omitempty"`
+	PublicPort     *int32             `db:"public_port" json:"public_port,omitempty"`
 	Status         string             `db:"status" json:"status"`
 	AuthToken      pgtype.Text        `db:"auth_token" json:"auth_token"`
 	MaxConnections pgtype.Int4        `db:"max_connections" json:"max_connections"`
@@ -342,8 +342,8 @@ LIMIT $2 OFFSET $3
 
 type ListTunnelsByUserParams struct {
 	UserID uuid.UUID `db:"user_id" json:"user_id"`
-	Limit  int32       `db:"limit" json:"limit"`
-	Offset int32       `db:"offset" json:"offset"`
+	Limit  int32     `db:"limit" json:"limit"`
+	Offset int32     `db:"offset" json:"offset"`
 }
 
 func (q *Queries) ListTunnelsByUser(ctx context.Context, arg ListTunnelsByUserParams) ([]Tunnels, error) {
@@ -392,14 +392,14 @@ RETURNING id, user_id, name, protocol, subdomain, custom_domain, target_host, ta
 `
 
 type UpdateTunnelParams struct {
-	ID             uuid.UUID        `db:"id" json:"id"`
+	ID             uuid.UUID          `db:"id" json:"id"`
 	Name           string             `db:"name" json:"name"`
 	TargetHost     string             `db:"target_host" json:"target_host"`
 	TargetPort     int32              `db:"target_port" json:"target_port"`
 	MaxConnections pgtype.Int4        `db:"max_connections" json:"max_connections"`
 	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 	Metadata       []byte             `db:"metadata" json:"metadata"`
-	UserID         uuid.UUID        `db:"user_id" json:"user_id"`
+	UserID         uuid.UUID          `db:"user_id" json:"user_id"`
 }
 
 func (q *Queries) UpdateTunnel(ctx context.Context, arg UpdateTunnelParams) (Tunnels, error) {
@@ -443,7 +443,7 @@ WHERE id = $1
 
 type UpdateTunnelStatusParams struct {
 	ID     uuid.UUID `db:"id" json:"id"`
-	Status string      `db:"status" json:"status"`
+	Status string    `db:"status" json:"status"`
 }
 
 func (q *Queries) UpdateTunnelStatus(ctx context.Context, arg UpdateTunnelStatusParams) error {
