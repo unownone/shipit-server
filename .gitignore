@@ -31,8 +31,6 @@ target/
 *.out
 coverage.html
 
-# Go module download cache
-go.sum
 
 # IDE
 .vscode/
