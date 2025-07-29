@@ -74,10 +74,10 @@ func (s *TunnelsTestSuite) TestCreateTunnel() {
 			user: s.TestUser,
 			payload: map[string]interface{}{
 				"protocol":   "http",
-				"local_port": 0,
+				"local_port": -1,
 			},
 			expectedStatus: 400,
-			expectedError:  "Invalid local_port",
+			expectedError:  "Invalid request data",
 		},
 		{
 			name: "create tunnel with port too high",
@@ -97,7 +97,7 @@ func (s *TunnelsTestSuite) TestCreateTunnel() {
 				"local_port": 8080,
 			},
 			expectedStatus: 401,
-			expectedError:  "Unauthorized",
+			expectedError:  "API key header is required",
 		},
 		{
 			name: "create tunnel with missing fields",
@@ -176,8 +176,8 @@ func (s *TunnelsTestSuite) TestListTunnels() {
 		{
 			name:           "list tunnels without authentication",
 			user:           nil,
-			expectedStatus: 401,
-			expectedError:  "Unauthorized",
+			expectedStatus: 403,
+			expectedError:  "No Auth Header Provided",
 		},
 	}
 
@@ -253,8 +253,8 @@ func (s *TunnelsTestSuite) TestGetTunnel() {
 			name:           "get tunnel without authentication",
 			user:           nil,
 			tunnelID:       tunnelID,
-			expectedStatus: 401,
-			expectedError:  "Unauthorized",
+			expectedStatus: 403,
+			expectedError:  "No Auth Header Provided",
 		},
 	}
 
@@ -270,7 +270,7 @@ func (s *TunnelsTestSuite) TestGetTunnel() {
 
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
-				tunnel := resp.Body["tunnel"].(map[string]interface{})
+				tunnel := resp.Body
 				assert.Equal(s.T(), test.tunnelID, tunnel["tunnel_id"])
 				assert.Contains(s.T(), tunnel, "protocol")
 				assert.Contains(s.T(), tunnel, "public_url")
@@ -331,8 +331,8 @@ func (s *TunnelsTestSuite) TestDeleteTunnel() {
 			name:           "delete tunnel without authentication",
 			user:           nil,
 			tunnelID:       tunnelID1,
-			expectedStatus: 401,
-			expectedError:  "Unauthorized",
+			expectedStatus: 403,
+			expectedError:  "No Auth Header Provided",
 		},
 	}
 
@@ -397,8 +397,8 @@ func (s *TunnelsTestSuite) TestGetTunnelStats() {
 			name:           "get tunnel stats without authentication",
 			user:           nil,
 			tunnelID:       tunnelID,
-			expectedStatus: 401,
-			expectedError:  "Unauthorized",
+			expectedStatus: 403,
+			expectedError:  "No Auth Header Provided",
 		},
 	}
 

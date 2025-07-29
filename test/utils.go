@@ -15,7 +15,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -121,6 +120,13 @@ func SetupTestSuite(t *testing.T) *TestSuite {
 			AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 			AllowedHeaders: []string{"*"},
 		},
+		Tunnels: config.TunnelsConfig{
+			MaxPerUser: 10,
+			ConnectionPoolSize: 10,
+			SubdomainLength: 10, // 2 characters
+			DefaultTTL: 10 * time.Minute,
+			DomainHost: "localhost", // TODO: change domain to accept any host
+		},
 	}
 
 	// Wait a bit for PostgreSQL to be fully ready
@@ -188,13 +194,13 @@ func (s *TestSuite) TearDownTestSuite(t *testing.T) {
 
 	// Clean up test data
 	if s.TestUser != nil {
-		s.DB.Queries.DeactivateUser(ctx, uuidToPgUUID(s.TestUser.ID))
+		s.DB.Queries.DeactivateUser(ctx, s.TestUser.ID)
 	}
 	if s.TestUser2 != nil {
-		s.DB.Queries.DeactivateUser(ctx, uuidToPgUUID(s.TestUser2.ID))
+		s.DB.Queries.DeactivateUser(ctx, s.TestUser2.ID)
 	}
 	if s.AdminUser != nil {
-		s.DB.Queries.DeactivateUser(ctx, uuidToPgUUID(s.AdminUser.ID))
+		s.DB.Queries.DeactivateUser(ctx, s.AdminUser.ID)
 	}
 
 	// Close database connection
@@ -342,20 +348,16 @@ func (s *TestSuite) createUser(t *testing.T, ctx context.Context, email, passwor
 	})
 	require.NoError(t, err)
 
-	// Convert pgtype.UUID to uuid.UUID
-	userID, err := uuid.FromBytes(user.ID.Bytes[:])
-	require.NoError(t, err)
-
 	// Generate token pair
 	accessToken, refreshToken, err := s.JWTManager.GenerateTokenPair(ctx, &user)
 	require.NoError(t, err)
 
 	// Create API key
-	_, apiKey, err := s.APIKeyManager.GenerateAPIKey(ctx, userID, "Test Key", nil)
+	_, apiKey, err := s.APIKeyManager.GenerateAPIKey(ctx, user.ID, "Test Key", nil)
 	require.NoError(t, err)
 
 	return &TestUser{
-		ID:           userID,
+		ID:           user.ID,
 		Email:        email,
 		Password:     password,
 		Name:         name,
@@ -412,7 +414,7 @@ func (s *TestSuite) MakeRequest(method, path string, body interface{}, headers m
 // MakeAuthenticatedRequest makes a request with JWT token
 func (s *TestSuite) MakeAuthenticatedRequest(method, path string, body interface{}, user *TestUser) *APIResponse {
 	headers := map[string]string{
-		"Authorization": "Bearer " + user.AccessToken,
+		auth.JWTAuthorizationHeader: "Bearer " + user.AccessToken,
 	}
 	return s.MakeRequest(method, path, body, headers)
 }
@@ -420,7 +422,7 @@ func (s *TestSuite) MakeAuthenticatedRequest(method, path string, body interface
 // MakeAPIKeyRequest makes a request with API key
 func (s *TestSuite) MakeAPIKeyRequest(method, path string, body interface{}, user *TestUser) *APIResponse {
 	headers := map[string]string{
-		"Authorization": "Bearer " + user.APIKey,
+		auth.APIKeyAuthorizationHeader: user.APIKey,
 	}
 	return s.MakeRequest(method, path, body, headers)
 }
@@ -440,29 +442,6 @@ func AssertErrorResponse(t *testing.T, resp *APIResponse, expectedStatus int, ex
 			t.Errorf("Expected error message containing '%s', but no error field found in response: %+v", expectedError, resp.Body)
 		}
 	}
-}
-
-// Helper functions for UUID conversion
-func uuidToPgUUID(id uuid.UUID) pgtype.UUID {
-	var pgUUID pgtype.UUID
-	pgUUID.Bytes = id
-	pgUUID.Valid = true
-	return pgUUID
-}
-
-func pgUUIDToUUID(pgUUID pgtype.UUID) uuid.UUID {
-	var id uuid.UUID
-	if pgUUID.Valid {
-		copy(id[:], pgUUID.Bytes[:])
-	}
-	return id
-}
-
-func getEnvOrDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
 }
 
 // WaitForCondition waits for a condition to be true with timeout

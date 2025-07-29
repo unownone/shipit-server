@@ -81,24 +81,28 @@ func SetupRoutes(
 	apiProtected := v1.Group("/")
 	apiProtected.Use(authMiddleware.APIKeyAuth())
 	{
-		// Tunnel management (Control Plane API)
+		// Tunnel Creation
 		apiProtected.POST("/tunnels", tunnelHandler.CreateTunnel)
-		apiProtected.GET("/tunnels", tunnelHandler.ListTunnels)
-		apiProtected.GET("/tunnels/:tunnelId", tunnelHandler.GetTunnel)
-		apiProtected.DELETE("/tunnels/:tunnelId", tunnelHandler.DeleteTunnel)
-		apiProtected.GET("/tunnels/:tunnelId/stats", tunnelHandler.GetTunnelStats)
-
-		// Analytics for specific tunnels (also available via API key)
-		apiProtected.GET("/analytics/tunnels/:tunnel_id/stats", analyticsHandler.GetTunnelStats)
 	}
 
-	// Mixed auth endpoints (both JWT and API key accepted)
-	mixed := v1.Group("/")
-	mixed.Use(authMiddleware.OptionalAuth())
+
+	optionalAuth := v1.Group("/")
+	optionalAuth.Use(authMiddleware.OptionalAuth())
 	{
-		// Authentication validation endpoint
-		mixed.POST("/auth/validate", authHandler.ValidateToken)
-		mixed.GET("/auth/info", authHandler.GetTokenInfo)
+		optionalAuth.POST("/auth/validate", authHandler.ValidateToken)
+	}
+
+	// both jwt and api key supported auth
+	combinedAuth := v1.Group("/")
+	combinedAuth.Use(authMiddleware.CombinedAuth())
+	{
+		// Tunnel management (Control Plane API)
+		combinedAuth.GET("/tunnels", tunnelHandler.ListTunnels)
+		combinedAuth.GET("/tunnels/:tunnel_id", tunnelHandler.GetTunnel)
+		combinedAuth.DELETE("/tunnels/:tunnel_id", tunnelHandler.DeleteTunnel)
+		combinedAuth.GET("/tunnels/:tunnel_id/stats", tunnelHandler.GetTunnelStats)
+		combinedAuth.GET("/analytics/tunnels/:tunnel_id/stats", analyticsHandler.GetTunnelStats)
+		combinedAuth.GET("/auth/token/info", authHandler.GetTokenInfo)
 	}
 
 	// Admin endpoints (admin role required)

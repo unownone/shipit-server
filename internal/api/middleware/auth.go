@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -25,11 +26,80 @@ func NewAuthMiddleware(jwtManager *auth.JWTManager, apiKeyManager *auth.APIKeyMa
 	}
 }
 
+// AuthResult represents the result of an authentication attempt
+type AuthResult struct {
+	User     *sqlc.Users
+	UserID   uuid.UUID
+	UserRole auth.UserRole
+	APIKey   *sqlc.GetAPIKeyByHashRow // Only set for API key auth
+	AuthType string                   // "jwt" or "api_key"
+	Success  bool
+	Error    error
+}
+
+// authenticateJWT attempts to authenticate using JWT token
+func (am *AuthMiddleware) authenticateJWT(ctx context.Context, token string) AuthResult {
+	// Validate the JWT token
+	user, err := am.jwtManager.GetUserFromToken(ctx, token)
+	if err != nil {
+		return AuthResult{
+			Success: false,
+			Error:   err,
+		}
+	}
+
+	// Extract UUID from uuid.UUID for context storage
+
+
+	return AuthResult{
+		User:     user,
+		UserID:   user.ID,
+		UserRole: auth.UserRole(user.Role),
+		AuthType: "jwt",
+		Success:  true,
+	}
+}
+
+// authenticateAPIKey attempts to authenticate using API key
+func (am *AuthMiddleware) authenticateAPIKey(ctx context.Context, apiKey string) AuthResult {
+	// Validate the API key
+	user, keyInfo, err := am.apiKeyManager.ValidateAPIKey(ctx, apiKey)
+	if err != nil {
+		return AuthResult{
+			Success: false,
+			Error:   err,
+		}
+	}
+
+
+
+	return AuthResult{
+		User:     user,
+		UserID:   user.ID,
+		UserRole: auth.UserRole(user.Role),
+		APIKey:   keyInfo,
+		AuthType: "api_key",
+		Success:  true,
+	}
+}
+
+// setAuthContext sets the authentication context in gin
+func setAuthContext(c *gin.Context, result AuthResult) {
+	c.Set("user", result.User)
+	c.Set("user_id", result.UserID)
+	c.Set("user_role", result.UserRole)
+	c.Set("auth_type", result.AuthType)
+
+	if result.APIKey != nil {
+		c.Set("api_key", result.APIKey)
+	}
+}
+
 // JWTAuth middleware for JWT-based authentication (web users)
 func (am *AuthMiddleware) JWTAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Extract token from Authorization header
-		authHeader := c.GetHeader("Authorization")
+		authHeader := c.GetHeader(auth.JWTAuthorizationHeader)
 		if authHeader == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "Authorization header is required",
@@ -50,9 +120,9 @@ func (am *AuthMiddleware) JWTAuth() gin.HandlerFunc {
 
 		token := parts[1]
 
-		// Validate the JWT token (now with context)
-		user, err := am.jwtManager.GetUserFromToken(c.Request.Context(), token)
-		if err != nil {
+		// Authenticate using JWT
+		result := am.authenticateJWT(c.Request.Context(), token)
+		if !result.Success {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "Invalid or expired token",
 			})
@@ -60,21 +130,8 @@ func (am *AuthMiddleware) JWTAuth() gin.HandlerFunc {
 			return
 		}
 
-		// Extract UUID from pgtype.UUID for context storage
-		userID, err := uuid.FromBytes(user.ID.Bytes[:])
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Invalid user ID",
-			})
-			c.Abort()
-			return
-		}
-
-		// Store user in context
-		c.Set("user", user)
-		c.Set("user_id", userID)
-		c.Set("user_role", auth.UserRole(user.Role))
-
+		// Set context
+		setAuthContext(c, result)
 		c.Next()
 	}
 }
@@ -83,30 +140,17 @@ func (am *AuthMiddleware) JWTAuth() gin.HandlerFunc {
 func (am *AuthMiddleware) APIKeyAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Extract API key from Authorization header
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
+		apiKey := c.GetHeader(auth.APIKeyAuthorizationHeader)
+		if apiKey == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Authorization header is required",
+				"error": "API key header is required",
 			})
 			c.Abort()
 			return
 		}
-
-		// Check if it's a Bearer token
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Invalid authorization header format",
-			})
-			c.Abort()
-			return
-		}
-
-		apiKey := parts[1]
-
-		// Validate the API key (now with context)
-		user, keyInfo, err := am.apiKeyManager.ValidateAPIKey(c.Request.Context(), apiKey)
-		if err != nil {
+		// Authenticate using API key
+		result := am.authenticateAPIKey(c.Request.Context(), apiKey)
+		if !result.Success {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "Invalid API key",
 			})
@@ -114,24 +158,98 @@ func (am *AuthMiddleware) APIKeyAuth() gin.HandlerFunc {
 			return
 		}
 
-		// Extract UUID from pgtype.UUID for context storage
-		var userID uuid.UUID
-		err = userID.Scan(user.ID.Bytes)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Invalid user ID",
+		// Set context
+		setAuthContext(c, result)
+		c.Next()
+	}
+}
+
+// CombinedAuth middleware that tries both JWT and API key authentication
+func (am *AuthMiddleware) CombinedAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Extract token from Authorization header
+
+		// check for jwt auth header
+		if jwtAuthHeader := c.GetHeader(auth.JWTAuthorizationHeader); jwtAuthHeader != "" {
+			parts := strings.SplitN(jwtAuthHeader, " ", 2)
+			if len(parts) != 2 || parts[0] != "Bearer" {
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"error": "Invalid authorization header format",
+				})
+				c.Abort()
+				return
+			}
+			jwtAuthHeader = parts[1]
+			// try jwt auth
+			result := am.authenticateJWT(c.Request.Context(), jwtAuthHeader)
+			if result.Success {
+				setAuthContext(c, result)
+				c.Next()
+				return
+			}
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "Invalid or expired token",
 			})
 			c.Abort()
 			return
 		}
 
-		// Store user and API key info in context
-		c.Set("user", user)
-		c.Set("user_id", userID)
-		c.Set("user_role", auth.UserRole(user.Role))
-		c.Set("api_key", keyInfo)
+		// check for api key auth header
+		if apiKeyAuthHeader := c.GetHeader(auth.APIKeyAuthorizationHeader); apiKeyAuthHeader != "" {
+			// try api key auth
+			result := am.authenticateAPIKey(c.Request.Context(), apiKeyAuthHeader)
+			if result.Success {
+				setAuthContext(c, result)
+				c.Next()
+				return
+			} else {
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"error": "Invalid API key",
+				})
+				c.Abort()
+				return
+			}
+		}
 
-		c.Next()
+		// if no auth header, return unauthorized
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "No Auth Header Provided",
+		})
+		c.Abort()
+	}
+}
+
+
+func (am *AuthMiddleware) OptionalAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Extract token from Authorization header
+
+		defer c.Next()
+
+		// check for jwt auth header
+		if jwtAuthHeader := c.GetHeader(auth.JWTAuthorizationHeader); jwtAuthHeader != "" {
+			parts := strings.SplitN(jwtAuthHeader, " ", 2)
+			if len(parts) != 2 || parts[0] != "Bearer" {
+				return
+			}
+			jwtAuthHeader = parts[1]
+			// try jwt auth
+			result := am.authenticateJWT(c.Request.Context(), jwtAuthHeader)
+			if result.Success {
+				setAuthContext(c, result)
+				return
+			}
+			return
+		}
+
+		// check for api key auth header
+		if apiKeyAuthHeader := c.GetHeader(auth.APIKeyAuthorizationHeader); apiKeyAuthHeader != "" {
+			// try api key auth
+			if result := am.authenticateAPIKey(c.Request.Context(), apiKeyAuthHeader); result.Success {
+				setAuthContext(c, result)
+			}
+		}
+
 	}
 }
 
@@ -187,57 +305,6 @@ func hasPermission(userRole, requiredRole auth.UserRole) bool {
 	return userLevel >= requiredLevel
 }
 
-// OptionalAuth middleware that tries to authenticate but doesn't fail if no auth provided
-func (am *AuthMiddleware) OptionalAuth() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.Next()
-			return
-		}
-
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.Next()
-			return
-		}
-
-		token := parts[1]
-
-		// Try JWT first (now with context)
-		if user, err := am.jwtManager.GetUserFromToken(c.Request.Context(), token); err == nil {
-			// Extract UUID from pgtype.UUID
-			var userID uuid.UUID
-			if err := userID.Scan(user.ID.Bytes); err == nil {
-				c.Set("user", user)
-				c.Set("user_id", userID)
-				c.Set("user_role", auth.UserRole(user.Role))
-				c.Set("auth_type", "jwt")
-				c.Next()
-				return
-			}
-		}
-
-		// Try API key (now with context)
-		if user, keyInfo, err := am.apiKeyManager.ValidateAPIKey(c.Request.Context(), token); err == nil {
-			// Extract UUID from pgtype.UUID
-			var userID uuid.UUID
-			if err := userID.Scan(user.ID.Bytes); err == nil {
-				c.Set("user", user)
-				c.Set("user_id", userID)
-				c.Set("user_role", auth.UserRole(user.Role))
-				c.Set("api_key", keyInfo)
-				c.Set("auth_type", "api_key")
-				c.Next()
-				return
-			}
-		}
-
-		// If both fail, continue without authentication
-		c.Next()
-	}
-}
-
 // GetCurrentUser helper function to get the current user from context
 func GetCurrentUser(c *gin.Context) (*sqlc.Users, bool) {
 	user, exists := c.Get("user")
@@ -269,4 +336,4 @@ func GetCurrentUserRole(c *gin.Context) (auth.UserRole, bool) {
 
 	roleObj, ok := role.(auth.UserRole)
 	return roleObj, ok
-} 
+}

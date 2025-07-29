@@ -458,8 +458,8 @@ func (c *Collector) saveMetrics(ctx context.Context, metrics *TunnelMetrics) err
 	metrics.mutex.RLock()
 	defer metrics.mutex.RUnlock()
 	
-	// Convert UUID to pgtype.UUID
-	var pgTunnelID pgtype.UUID
+	// Convert UUID to uuid.UUID
+	var pgTunnelID uuid.UUID
 	pgTunnelID.Scan(metrics.TunnelID.String())
 	
 	// Calculate average response time

@@ -7,7 +7,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/unwonone/shipit-server/internal/api/middleware"
 	"github.com/unwonone/shipit-server/internal/database"
 	"github.com/unwonone/shipit-server/internal/logger"
@@ -126,8 +125,8 @@ func (h *AnalyticsHandler) GetOverview(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	// Convert UUID to pgtype.UUID
-	var pgUserID pgtype.UUID
+	// Convert UUID to uuid.UUID
+	var pgUserID uuid.UUID
 	pgUserID.Scan(userID.String())
 
 	// Get total tunnels count
@@ -187,8 +186,8 @@ func (h *AnalyticsHandler) GetTunnelStats(c *gin.Context) {
 	tunnelIDStr := c.Param("tunnel_id")
 	tunnelID, err := uuid.Parse(tunnelIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid tunnel ID",
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Tunnel not found",
 		})
 		return
 	}
@@ -207,7 +206,7 @@ func (h *AnalyticsHandler) GetTunnelStats(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	// Convert UUIDs
-	var pgTunnelID pgtype.UUID
+	var pgTunnelID uuid.UUID
 	pgTunnelID.Scan(tunnelID.String())
 
 	// Verify tunnel ownership
@@ -219,9 +218,7 @@ func (h *AnalyticsHandler) GetTunnelStats(c *gin.Context) {
 		return
 	}
 
-	var tunnelUserID uuid.UUID
-	tunnelUserID.Scan(tunnel.UserID.Bytes)
-	if tunnelUserID != userID {
+	if tunnel.UserID != userID {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "Tunnel not found",
 		})

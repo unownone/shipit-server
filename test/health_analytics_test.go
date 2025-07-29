@@ -24,7 +24,7 @@ func (s *HealthAnalyticsTestSuite) TearDownTest() {
 // TestHealthCheck tests the health check endpoint
 func (s *HealthAnalyticsTestSuite) TestHealthCheck() {
 	resp := s.MakeRequest("GET", "/health", nil, nil)
-	
+
 	AssertSuccessResponse(s.T(), resp, 200)
 	assert.Equal(s.T(), "healthy", resp.Body["status"])
 	assert.Contains(s.T(), resp.Body, "version")
@@ -205,8 +205,8 @@ func (s *HealthAnalyticsTestSuite) TestGetTunnelAnalytics() {
 			name:           "get tunnel analytics without authentication",
 			user:           nil,
 			tunnelID:       tunnelID,
-			expectedStatus: 401,
-			expectedError:  "Authorization header is required",
+			expectedStatus: 403,
+			expectedError:  "No Auth Header Provided",
 		},
 	}
 
@@ -221,14 +221,22 @@ func (s *HealthAnalyticsTestSuite) TestGetTunnelAnalytics() {
 			}
 
 			if test.expectedStatus < 400 {
-				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
+				assert.Equal(s.T(), test.expectedStatus, resp.StatusCode, "Response body: %+v", resp.Body)
 				assert.Contains(s.T(), resp.Body, "tunnel_id")
 				assert.Contains(s.T(), resp.Body, "metrics")
 				assert.Contains(s.T(), resp.Body, "time_series")
 				assert.Contains(s.T(), resp.Body, "period")
 				assert.Equal(s.T(), test.tunnelID, resp.Body["tunnel_id"])
 			} else {
-				AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
+				assert.Equal(s.T(), test.expectedStatus, resp.StatusCode)
+				if test.expectedError == "" {
+					return
+				}
+				if errorMsg, ok := resp.Body["error"]; ok {
+					assert.Contains(s.T(), errorMsg, test.expectedError)
+				} else {
+					s.T().Errorf("Expected error message containing '%s', but no error field found in response: %+v", test.expectedError, resp.Body)
+				}
 			}
 		})
 	}
@@ -236,4 +244,4 @@ func (s *HealthAnalyticsTestSuite) TestGetTunnelAnalytics() {
 
 func TestHealthAnalyticsTestSuite(t *testing.T) {
 	suite.Run(t, new(HealthAnalyticsTestSuite))
-} 
+}

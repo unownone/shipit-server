@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/unwonone/shipit-server/internal/config"
 	"github.com/unwonone/shipit-server/internal/database"
 	"github.com/unwonone/shipit-server/internal/logger"
@@ -280,7 +279,7 @@ func (al *AgentListener) handleConnection(conn net.Conn) {
 // validateTunnelAccess validates that the tunnel exists and the client has access
 func (al *AgentListener) validateTunnelAccess(ctx context.Context, tunnelID uuid.UUID, regPayload *TunnelRegistrationPayload) (*tunnel.Tunnel, error) {
 	// Get tunnel from database to verify it exists
-	var pgTunnelID pgtype.UUID
+	var pgTunnelID uuid.UUID
 	pgTunnelID.Scan(tunnelID.String())
 	
 	dbTunnel, err := al.db.Queries.GetTunnelByID(ctx, pgTunnelID)
@@ -304,12 +303,9 @@ func (al *AgentListener) validateTunnelAccess(ctx context.Context, tunnelID uuid
 	}
 	
 	// Create tunnel object for validation
-	var userID uuid.UUID
-	userID.Scan(dbTunnel.UserID.Bytes)
-	
 	tunnel := &tunnel.Tunnel{
 		ID:         tunnelID,
-		UserID:     userID,
+		UserID:     dbTunnel.UserID,
 		Protocol:   dbTunnel.Protocol,
 		TargetHost: dbTunnel.TargetHost,
 		TargetPort: dbTunnel.TargetPort,

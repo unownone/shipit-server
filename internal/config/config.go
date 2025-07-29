@@ -86,6 +86,7 @@ type TunnelsConfig struct {
 	ConnectionPoolSize int           `mapstructure:"connection_pool_size"`
 	SubdomainLength    int           `mapstructure:"subdomain_length"`
 	DefaultTTL         time.Duration `mapstructure:"default_ttl"`
+	DomainHost         string        `mapstructure:"domain_host"`
 }
 
 type AnalyticsConfig struct {
@@ -234,6 +235,7 @@ func setDefaults() {
 	viper.SetDefault("tunnels.connection_pool_size", 10)
 	viper.SetDefault("tunnels.subdomain_length", 8)
 	viper.SetDefault("tunnels.default_ttl", "24h")
+	viper.SetDefault("tunnels.domain_host", "localhost")
 
 	// Analytics defaults
 	viper.SetDefault("analytics.enabled", true)

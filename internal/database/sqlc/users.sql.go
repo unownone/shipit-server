@@ -8,6 +8,7 @@ package sqlc
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -75,7 +76,7 @@ SET is_active = false, updated_at = NOW()
 WHERE id = $1
 `
 
-func (q *Queries) DeactivateUser(ctx context.Context, id pgtype.UUID) error {
+func (q *Queries) DeactivateUser(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deactivateUser, id)
 	return err
 }
@@ -111,7 +112,7 @@ const getUserByID = `-- name: GetUserByID :one
 SELECT id, email, password_hash, name, role, is_active, email_verified, email_verification_token, password_reset_token, password_reset_expires_at, last_login_at, failed_login_attempts, locked_until, created_at, updated_at FROM users WHERE id = $1 AND is_active = true
 `
 
-func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (Users, error) {
+func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (Users, error) {
 	row := q.db.QueryRow(ctx, getUserByID, id)
 	var i Users
 	err := row.Scan(
@@ -232,7 +233,7 @@ WHERE id = $1
 `
 
 type SetEmailVerificationTokenParams struct {
-	ID                     pgtype.UUID `db:"id" json:"id"`
+	ID                     uuid.UUID `db:"id" json:"id"`
 	EmailVerificationToken pgtype.Text `db:"email_verification_token" json:"email_verification_token"`
 }
 
@@ -266,7 +267,7 @@ RETURNING id, email, password_hash, name, role, is_active, email_verified, email
 `
 
 type UpdateUserParams struct {
-	ID            pgtype.UUID `db:"id" json:"id"`
+	ID            uuid.UUID `db:"id" json:"id"`
 	Name          string      `db:"name" json:"name"`
 	Email         string      `db:"email" json:"email"`
 	Role          string      `db:"role" json:"role"`
@@ -308,7 +309,7 @@ SET last_login_at = NOW(), failed_login_attempts = 0, locked_until = NULL, updat
 WHERE id = $1
 `
 
-func (q *Queries) UpdateUserLastLogin(ctx context.Context, id pgtype.UUID) error {
+func (q *Queries) UpdateUserLastLogin(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, updateUserLastLogin, id)
 	return err
 }
@@ -320,7 +321,7 @@ WHERE id = $1 AND is_active = true
 `
 
 type UpdateUserPasswordParams struct {
-	ID           pgtype.UUID `db:"id" json:"id"`
+	ID           uuid.UUID `db:"id" json:"id"`
 	PasswordHash string      `db:"password_hash" json:"password_hash"`
 }
 

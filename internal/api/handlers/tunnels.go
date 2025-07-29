@@ -12,10 +12,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/sirupsen/logrus"
 	"github.com/unwonone/shipit-server/internal/api/middleware"
 	"github.com/unwonone/shipit-server/internal/config"
 	"github.com/unwonone/shipit-server/internal/database"
 	"github.com/unwonone/shipit-server/internal/database/sqlc"
+	"github.com/unwonone/shipit-server/internal/logger"
 )
 
 // TunnelProtocol represents supported tunnel protocols
@@ -51,19 +53,19 @@ func NewTunnelHandler(db *database.Database, config *config.Config) *TunnelHandl
 
 // CreateTunnelRequest represents a tunnel creation request as per Architecture.md
 type CreateTunnelRequest struct {
-	Protocol  TunnelProtocol `json:"protocol" binding:"required"`           // "http" or "tcp"
-	LocalPort int32          `json:"local_port" binding:"required,min=1"`   // Port on client side
-	Subdomain *string        `json:"subdomain,omitempty"`                   // Optional custom subdomain
+	Protocol  TunnelProtocol `json:"protocol" binding:"required"`         // "http" or "tcp"
+	LocalPort int32          `json:"local_port" binding:"required,min=1"` // Port on client side
+	Subdomain *string        `json:"subdomain,omitempty"`                 // Optional custom subdomain
 }
 
 // CreateTunnelResponse represents tunnel creation response as per Architecture.md
 type CreateTunnelResponse struct {
-	TunnelID  string `json:"tunnel_id"`           // UUID of created tunnel
-	PublicURL string `json:"public_url"`          // Public URL for accessing tunnel
+	TunnelID   string `json:"tunnel_id"`             // UUID of created tunnel
+	PublicURL  string `json:"public_url"`            // Public URL for accessing tunnel
 	PublicPort *int32 `json:"public_port,omitempty"` // For TCP tunnels only
-	Status    string `json:"status"`              // Current status
-	Protocol  string `json:"protocol"`            // http or tcp
-	CreatedAt string `json:"created_at"`          // ISO timestamp
+	Status     string `json:"status"`                // Current status
+	Protocol   string `json:"protocol"`              // http or tcp
+	CreatedAt  string `json:"created_at"`            // ISO timestamp
 }
 
 // TunnelListResponse represents a tunnel in list response
@@ -81,22 +83,22 @@ type TunnelListResponse struct {
 
 // TunnelStatsResponse represents tunnel statistics
 type TunnelStatsResponse struct {
-	TunnelID          string                   `json:"tunnel_id"`
-	ActiveConnections int64                    `json:"active_connections"`
-	TotalRequests     int64                    `json:"total_requests"`
-	TotalBytesIn      int64                    `json:"total_bytes_in"`
-	TotalBytesOut     int64                    `json:"total_bytes_out"`
-	Analytics         []TunnelAnalyticsPoint   `json:"analytics"`
+	TunnelID          string                 `json:"tunnel_id"`
+	ActiveConnections int64                  `json:"active_connections"`
+	TotalRequests     int64                  `json:"total_requests"`
+	TotalBytesIn      int64                  `json:"total_bytes_in"`
+	TotalBytesOut     int64                  `json:"total_bytes_out"`
+	Analytics         []TunnelAnalyticsPoint `json:"analytics"`
 }
 
 // TunnelAnalyticsPoint represents a single analytics data point
 type TunnelAnalyticsPoint struct {
-	Timestamp        string  `json:"timestamp"`
-	RequestsCount    int64   `json:"requests_count"`
-	BytesIn          int64   `json:"bytes_in"`
-	BytesOut         int64   `json:"bytes_out"`
-	ResponseTimeAvg  float32 `json:"response_time_avg"`
-	ErrorCount       int64   `json:"error_count"`
+	Timestamp       string  `json:"timestamp"`
+	RequestsCount   int64   `json:"requests_count"`
+	BytesIn         int64   `json:"bytes_in"`
+	BytesOut        int64   `json:"bytes_out"`
+	ResponseTimeAvg float32 `json:"response_time_avg"`
+	ErrorCount      int64   `json:"error_count"`
 }
 
 // IsValid checks if the protocol is valid
@@ -140,13 +142,8 @@ func (h *TunnelHandler) CreateTunnel(c *gin.Context) {
 		})
 		return
 	}
-
-	// Convert UUID to pgtype.UUID for database queries
-	var pgUserID pgtype.UUID
-	pgUserID.Scan(userID.String())
-
 	// Check user's tunnel limit
-	tunnelCount, err := h.db.Queries.CountActiveTunnelsByUser(ctx, pgUserID)
+	tunnelCount, err := h.db.Queries.CountActiveTunnelsByUser(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to check tunnel limit",
@@ -163,48 +160,53 @@ func (h *TunnelHandler) CreateTunnel(c *gin.Context) {
 
 	// Generate subdomain and setup tunnel parameters
 	var subdomain pgtype.Text
-	var publicPort pgtype.Int4
+	var publicPort *int32
 	var publicURL string
 
-	if req.Protocol == ProtocolHTTP {
-		// Generate subdomain for HTTP tunnels
-		subdomainStr := ""
-		if req.Subdomain != nil && *req.Subdomain != "" {
-			// Validate custom subdomain
-			if !isValidSubdomain(*req.Subdomain) {
-				c.JSON(http.StatusBadRequest, gin.H{
-					"error": "Invalid subdomain. Must be 3-20 characters, lowercase letters, numbers, and hyphens only",
+	switch req.Protocol {
+	case ProtocolHTTP:
+		{
+			// Generate subdomain for HTTP tunnels
+			subdomainStr := ""
+			if req.Subdomain != nil && *req.Subdomain != "" {
+				// Validate custom subdomain
+				if !isValidSubdomain(*req.Subdomain) {
+					c.JSON(http.StatusBadRequest, gin.H{
+						"error": "Invalid subdomain. Must be 3-20 characters, lowercase letters, numbers, and hyphens only",
+					})
+					return
+				}
+
+				// Check if subdomain is available
+				if !h.isSubdomainAvailable(ctx, *req.Subdomain) {
+					c.JSON(http.StatusConflict, gin.H{
+						"error": "Subdomain is already taken",
+					})
+					return
+				}
+
+				subdomainStr = *req.Subdomain
+			} else {
+				// Generate random subdomain
+				subdomainStr = h.generateRandomSubdomain(ctx)
+			}
+			subdomain.Scan(subdomainStr)
+			publicURL = fmt.Sprintf("https://%s.%s", subdomainStr, h.config.Tunnels.DomainHost)
+
+		}
+	case ProtocolTCP:
+		{
+			// Assign a public port for TCP tunnels
+			port, err := h.findAvailablePort(ctx)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": "No available ports for TCP tunnel",
 				})
 				return
 			}
-
-			// Check if subdomain is available
-			if !h.isSubdomainAvailable(ctx, *req.Subdomain) {
-				c.JSON(http.StatusConflict, gin.H{
-					"error": "Subdomain is already taken",
-				})
-				return
-			}
-
-			subdomainStr = *req.Subdomain
-		} else {
-			// Generate random subdomain
-			subdomainStr = h.generateRandomSubdomain(ctx)
+			publicPort = &port
+			publicURL = fmt.Sprintf("%s:%d", h.config.Tunnels.DomainHost, port)
 		}
-		subdomain.Scan(subdomainStr)
-		publicURL = fmt.Sprintf("https://%s.%s", subdomainStr, h.config.Server.Domain)
-
-	} else if req.Protocol == ProtocolTCP {
-		// Assign a public port for TCP tunnels
-		port, err := h.findAvailablePort(ctx)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "No available ports for TCP tunnel",
-			})
-			return
-		}
-		publicPort.Scan(port)
-		publicURL = fmt.Sprintf("%s:%d", h.config.Server.Domain, port)
 	}
 
 	// Set default TTL if not provided
@@ -217,29 +219,36 @@ func (h *TunnelHandler) CreateTunnel(c *gin.Context) {
 
 	// Create tunnel in database
 	tunnel, err := h.db.Queries.CreateTunnel(ctx, sqlc.CreateTunnelParams{
-		UserID:       pgUserID,
-		Name:         tunnelName,
-		Protocol:     string(req.Protocol),
-		Subdomain:    subdomain,
-		TargetHost:   "localhost", // Client will connect to localhost
-		TargetPort:   req.LocalPort,
-		PublicPort:   publicPort,
-		Status:       string(StatusActive),
-		ExpiresAt:    pgExpiresAt,
+		UserID:     userID,
+		Name:       tunnelName,
+		Protocol:   string(req.Protocol),
+		Subdomain:  subdomain,
+		TargetHost: "localhost", // Client will connect to localhost
+		TargetPort: req.LocalPort,
+		PublicPort: publicPort,
+		Status:     string(StatusActive),
+		ExpiresAt:  pgExpiresAt,
 	})
 	if err != nil {
+		logger.WithFields(logrus.Fields{
+			"error": err,
+			"user_id": userID,
+			"tunnel_name": tunnelName,
+			"subdomain": subdomain,
+			"public_port": publicPort,
+			"public_url": publicURL,
+			"expires_at": defaultExpiry,
+		}).Error("Failed to create tunnel")
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to create tunnel",
 		})
 		return
 	}
 
-	// Convert response according to Architecture.md specification
-	var tunnelID uuid.UUID
-	tunnelID.Scan(tunnel.ID.Bytes)
+
 
 	response := CreateTunnelResponse{
-		TunnelID:  tunnelID.String(),
+		TunnelID:  tunnel.ID.String(),
 		PublicURL: publicURL,
 		Status:    tunnel.Status,
 		Protocol:  tunnel.Protocol,
@@ -247,9 +256,8 @@ func (h *TunnelHandler) CreateTunnel(c *gin.Context) {
 	}
 
 	// Add public port for TCP tunnels
-	if tunnel.PublicPort.Valid {
-		port := tunnel.PublicPort.Int32
-		response.PublicPort = &port
+	if tunnel.PublicPort != nil {
+		response.PublicPort = tunnel.PublicPort
 	}
 
 	c.JSON(http.StatusCreated, response)
@@ -282,8 +290,8 @@ func (h *TunnelHandler) ListTunnels(c *gin.Context) {
 		offset = 0
 	}
 
-	// Convert UUID to pgtype.UUID
-	var pgUserID pgtype.UUID
+	// Convert UUID to uuid.UUID
+	var pgUserID uuid.UUID
 	pgUserID.Scan(userID.String())
 
 	// Get tunnels
@@ -317,7 +325,9 @@ func (h *TunnelHandler) ListTunnels(c *gin.Context) {
 		tunnelList[i] = h.formatTunnelListResponse(&tunnel)
 	}
 
-	c.JSON(http.StatusOK, tunnelList)
+	c.JSON(http.StatusOK, gin.H{
+		"tunnels": tunnelList,
+	})
 }
 
 // GetTunnel gets a specific tunnel - Control Plane API
@@ -330,19 +340,20 @@ func (h *TunnelHandler) GetTunnel(c *gin.Context) {
 		return
 	}
 
-	tunnelIDStr := c.Param("tunnelId")
+	tunnelIDStr := c.Param("tunnel_id")
+
 	tunnelID, err := uuid.Parse(tunnelIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid tunnel ID",
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Tunnel not found",
 		})
 		return
 	}
 
 	ctx := c.Request.Context()
 
-	// Convert UUIDs to pgtype.UUID
-	var pgTunnelID pgtype.UUID
+	// Convert UUIDs to uuid.UUID
+	var pgTunnelID uuid.UUID
 	pgTunnelID.Scan(tunnelID.String())
 
 	// Get tunnel and verify ownership
@@ -355,9 +366,7 @@ func (h *TunnelHandler) GetTunnel(c *gin.Context) {
 	}
 
 	// Verify ownership
-	var tunnelUserID uuid.UUID
-	tunnelUserID.Scan(tunnel.UserID.Bytes)
-	if tunnelUserID != userID {
+	if tunnel.UserID != userID {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "Tunnel not found",
 		})
@@ -378,19 +387,19 @@ func (h *TunnelHandler) DeleteTunnel(c *gin.Context) {
 		return
 	}
 
-	tunnelIDStr := c.Param("tunnelId")
+	tunnelIDStr := c.Param("tunnel_id")
 	tunnelID, err := uuid.Parse(tunnelIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid tunnel ID",
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Tunnel not found",
 		})
 		return
 	}
 
 	ctx := c.Request.Context()
 
-	// Convert UUIDs to pgtype.UUID
-	var pgTunnelID, pgUserID pgtype.UUID
+	// Convert UUIDs to uuid.UUID
+	var pgTunnelID, pgUserID uuid.UUID
 	pgTunnelID.Scan(tunnelID.String())
 	pgUserID.Scan(userID.String())
 
@@ -403,9 +412,7 @@ func (h *TunnelHandler) DeleteTunnel(c *gin.Context) {
 		return
 	}
 
-	var tunnelUserID uuid.UUID
-	tunnelUserID.Scan(tunnel.UserID.Bytes)
-	if tunnelUserID != userID {
+	if tunnel.UserID != userID {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "Tunnel not found",
 		})
@@ -428,9 +435,9 @@ func (h *TunnelHandler) DeleteTunnel(c *gin.Context) {
 	// This should trigger tunnel manager to close agent connections
 
 	c.JSON(http.StatusOK, gin.H{
-		"status": "terminated",
+		"status":    "terminated",
 		"tunnel_id": tunnelID.String(),
-		"message": "Tunnel terminated successfully",
+		"message":   "Tunnel terminated successfully",
 	})
 }
 
@@ -444,11 +451,11 @@ func (h *TunnelHandler) GetTunnelStats(c *gin.Context) {
 		return
 	}
 
-	tunnelIDStr := c.Param("tunnelId")
+	tunnelIDStr := c.Param("tunnel_id")
 	tunnelID, err := uuid.Parse(tunnelIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid tunnel ID",
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Tunnel not found",
 		})
 		return
 	}
@@ -459,8 +466,8 @@ func (h *TunnelHandler) GetTunnelStats(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	// Convert UUIDs to pgtype.UUID
-	var pgTunnelID pgtype.UUID
+	// Convert UUIDs to uuid.UUID
+	var pgTunnelID uuid.UUID
 	pgTunnelID.Scan(tunnelID.String())
 
 	// Verify tunnel ownership
@@ -472,9 +479,7 @@ func (h *TunnelHandler) GetTunnelStats(c *gin.Context) {
 		return
 	}
 
-	var tunnelUserID uuid.UUID
-	tunnelUserID.Scan(tunnel.UserID.Bytes)
-	if tunnelUserID != userID {
+	if tunnel.UserID != userID {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "Tunnel not found",
 		})
@@ -491,7 +496,7 @@ func (h *TunnelHandler) GetTunnelStats(c *gin.Context) {
 	}
 
 	// Format analytics response (simulated data for now)
-	var totalRequests, totalBytesIn, totalBytesOut int64 = 123, 1024*1024*5, 1024*1024*3 // 5MB in, 3MB out
+	var totalRequests, totalBytesIn, totalBytesOut int64 = 123, 1024 * 1024 * 5, 1024 * 1024 * 3 // 5MB in, 3MB out
 
 	response := TunnelStatsResponse{
 		TunnelID:          tunnelID.String(),
@@ -509,12 +514,8 @@ func (h *TunnelHandler) GetTunnelStats(c *gin.Context) {
 
 // formatTunnelListResponse formats a tunnel for list API response
 func (h *TunnelHandler) formatTunnelListResponse(tunnel *sqlc.Tunnels) TunnelListResponse {
-	// Extract UUID from pgtype.UUID
-	var tunnelID uuid.UUID
-	tunnelID.Scan(tunnel.ID.Bytes)
-
 	response := TunnelListResponse{
-		TunnelID:  tunnelID.String(),
+		TunnelID:  tunnel.ID.String(),
 		Protocol:  tunnel.Protocol,
 		Status:    tunnel.Status,
 		LocalPort: tunnel.TargetPort,
@@ -530,10 +531,9 @@ func (h *TunnelHandler) formatTunnelListResponse(tunnel *sqlc.Tunnels) TunnelLis
 	}
 
 	// Add public port and URL for TCP tunnels
-	if tunnel.PublicPort.Valid {
-		port := tunnel.PublicPort.Int32
-		response.PublicPort = &port
-		response.PublicURL = fmt.Sprintf("%s:%d", h.config.Server.Domain, port)
+	if tunnel.PublicPort != nil {
+		response.PublicPort = tunnel.PublicPort
+		response.PublicURL = fmt.Sprintf("%s:%d", h.config.Tunnels.DomainHost, *tunnel.PublicPort)
 	}
 
 	return response
@@ -597,7 +597,7 @@ func (h *TunnelHandler) findAvailablePort(ctx context.Context) (int32, error) {
 	// TODO: Implement actual port tracking in database
 	for attempt := 0; attempt < 100; attempt++ {
 		port := int32(30000 + rand.Intn(35535))
-		
+
 		// Check if port is available
 		_, err := h.db.Queries.GetTunnelByPublicPort(ctx, pgtype.Int4{Int32: port, Valid: true})
 		if err != nil { // Port not found = available
@@ -606,4 +606,4 @@ func (h *TunnelHandler) findAvailablePort(ctx context.Context) (int32, error) {
 	}
 
 	return 0, fmt.Errorf("no available ports found")
-} 
+}

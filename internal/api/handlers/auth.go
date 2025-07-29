@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/unwonone/shipit-server/internal/auth"
 )
 
@@ -78,13 +77,9 @@ func (h *AuthHandler) ValidateToken(c *gin.Context) {
 
 	// Try API key validation first
 	if user, _, err := h.apiKeyManager.ValidateAPIKey(ctx, token); err == nil {
-		// Extract UUID from user
-		var userID uuid.UUID
-		userID.Scan(user.ID.Bytes)
-
 		c.JSON(http.StatusOK, ValidateTokenResponse{
 			Valid:    true,
-			UserID:   userID.String(),
+			UserID:   user.ID.String(),
 			AuthType: "api_key",
 		})
 		return
@@ -92,13 +87,9 @@ func (h *AuthHandler) ValidateToken(c *gin.Context) {
 
 	// Try JWT validation
 	if user, err := h.jwtManager.GetUserFromToken(ctx, token); err == nil {
-		// Extract UUID from user
-		var userID uuid.UUID
-		userID.Scan(user.ID.Bytes)
-
 		c.JSON(http.StatusOK, ValidateTokenResponse{
 			Valid:    true,
-			UserID:   userID.String(),
+			UserID:   user.ID.String(),
 			AuthType: "jwt",
 		})
 		return
@@ -126,19 +117,15 @@ func (h *AuthHandler) GetTokenInfo(c *gin.Context) {
 
 	// Try API key validation
 	if user, apiKey, err := h.apiKeyManager.ValidateAPIKey(ctx, token); err == nil {
-		var userID, keyID uuid.UUID
-		userID.Scan(user.ID.Bytes)
-		keyID.Scan(apiKey.ID.Bytes)
-
 		c.JSON(http.StatusOK, gin.H{
 			"valid":      true,
 			"auth_type":  "api_key",
-			"user_id":    userID.String(),
+			"user_id":    user.ID.String(),
 			"user_email": user.Email,
 			"user_name":  user.Name,
 			"user_role":  user.Role,
 			"key_info": gin.H{
-				"id":           keyID.String(),
+				"id":           apiKey.ID.String(),
 				"name":         apiKey.Name,
 				"created_at":   apiKey.CreatedAt.Time,
 				"last_used_at": apiKey.LastUsedAt.Time,
@@ -150,13 +137,10 @@ func (h *AuthHandler) GetTokenInfo(c *gin.Context) {
 
 	// Try JWT validation
 	if user, err := h.jwtManager.GetUserFromToken(ctx, token); err == nil {
-		var userID uuid.UUID
-		userID.Scan(user.ID.Bytes)
-
 		c.JSON(http.StatusOK, gin.H{
 			"valid":      true,
 			"auth_type":  "jwt",
-			"user_id":    userID.String(),
+			"user_id":    user.ID.String(),
 			"user_email": user.Email,
 			"user_name":  user.Name,
 			"user_role":  user.Role,

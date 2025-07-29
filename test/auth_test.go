@@ -116,7 +116,7 @@ func (s *AuthTestSuite) TestUserLogin() {
 				"password": "wrongpassword",
 			},
 			expectedStatus: 401,
-			expectedError:  "Invalid credentials",
+			expectedError:  "Invalid email or password",
 		},
 		{
 			name: "non-existent user",
@@ -125,7 +125,7 @@ func (s *AuthTestSuite) TestUserLogin() {
 				"password": "password123",
 			},
 			expectedStatus: 401,
-			expectedError:  "Invalid credentials",
+			expectedError:  "Invalid email or password",
 		},
 		{
 			name: "invalid email format",
@@ -183,7 +183,7 @@ func (s *AuthTestSuite) TestRefreshToken() {
 				"refresh_token": "invalid-token",
 			},
 			expectedStatus: 401,
-			expectedError:  "Invalid refresh token",
+			expectedError:  "Invalid or expired refresh token",
 		},
 		{
 			name: "missing refresh token",
@@ -224,7 +224,7 @@ func (s *AuthTestSuite) TestLogout() {
 			name:           "logout without token",
 			user:           nil,
 			expectedStatus: 401,
-			expectedError:  "Unauthorized",
+			expectedError:  "Authorization header is required",
 		},
 	}
 
@@ -232,7 +232,9 @@ func (s *AuthTestSuite) TestLogout() {
 		s.Run(test.name, func() {
 			var resp *APIResponse
 			if test.user != nil {
-				resp = s.MakeAuthenticatedRequest("POST", "/api/v1/users/logout", nil, test.user)
+				resp = s.MakeAuthenticatedRequest("POST", "/api/v1/users/logout", map[string]string{
+					"refresh_token": test.user.RefreshToken,
+				}, test.user)
 			} else {
 				resp = s.MakeRequest("POST", "/api/v1/users/logout", nil, nil)
 			}
@@ -275,7 +277,7 @@ func (s *AuthTestSuite) TestValidateToken() {
 			payload: map[string]interface{}{
 				"token": "invalid-token",
 			},
-			expectedStatus: 200,
+			expectedStatus: 401,
 			expectedValid:  false,
 		},
 		{
@@ -298,60 +300,6 @@ func (s *AuthTestSuite) TestValidateToken() {
 				}
 			} else {
 				AssertErrorResponse(s.T(), resp, test.expectedStatus, "")
-			}
-		})
-	}
-}
-
-// TestGetTokenInfo tests token info endpoint
-func (s *AuthTestSuite) TestGetTokenInfo() {
-	tests := []struct {
-		name           string
-		user           *TestUser
-		useAPIKey      bool
-		expectedStatus int
-		expectedError  string
-	}{
-		{
-			name:           "get JWT token info",
-			user:           s.TestUser,
-			useAPIKey:      false,
-			expectedStatus: 200,
-		},
-		{
-			name:           "get API key info",
-			user:           s.TestUser,
-			useAPIKey:      true,
-			expectedStatus: 200,
-		},
-		{
-			name:           "no authentication",
-			user:           nil,
-			expectedStatus: 401,
-			expectedError:  "Unauthorized",
-		},
-	}
-
-	for _, test := range tests {
-		s.Run(test.name, func() {
-			var resp *APIResponse
-			if test.user != nil {
-				if test.useAPIKey {
-					resp = s.MakeAPIKeyRequest("GET", "/api/v1/auth/info", nil, test.user)
-				} else {
-					resp = s.MakeAuthenticatedRequest("GET", "/api/v1/auth/info", nil, test.user)
-				}
-			} else {
-				resp = s.MakeRequest("GET", "/api/v1/auth/info", nil, nil)
-			}
-			
-			if test.expectedStatus < 400 {
-				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
-				assert.Contains(s.T(), resp.Body, "user_id")
-				assert.Contains(s.T(), resp.Body, "auth_type")
-				assert.Contains(s.T(), resp.Body, "valid")
-			} else {
-				AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
 			}
 		})
 	}

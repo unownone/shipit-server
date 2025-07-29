@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/unwonone/shipit-server/internal/database"
 )
 
@@ -141,7 +140,7 @@ func (tm *TunnelManager) RegisterTunnel(ctx context.Context, tunnelID uuid.UUID)
 	}
 	
 	// Get tunnel from database
-	var pgTunnelID pgtype.UUID
+	var pgTunnelID uuid.UUID
 	pgTunnelID.Scan(tunnelID.String())
 	
 	dbTunnel, err := tm.db.Queries.GetTunnelByID(ctx, pgTunnelID)
@@ -149,14 +148,10 @@ func (tm *TunnelManager) RegisterTunnel(ctx context.Context, tunnelID uuid.UUID)
 		return nil, fmt.Errorf("failed to get tunnel from database: %w", err)
 	}
 	
-	// Extract UUIDs
-	var userID uuid.UUID
-	userID.Scan(dbTunnel.UserID.Bytes)
-	
 	// Create tunnel
 	tunnel := &Tunnel{
 		ID:         tunnelID,
-		UserID:     userID,
+		UserID:     dbTunnel.UserID,
 		Protocol:   dbTunnel.Protocol,
 		TargetHost: dbTunnel.TargetHost,
 		TargetPort: dbTunnel.TargetPort,
@@ -174,8 +169,8 @@ func (tm *TunnelManager) RegisterTunnel(ctx context.Context, tunnelID uuid.UUID)
 		tunnel.Subdomain = dbTunnel.Subdomain.String
 		tm.subdomains[tunnel.Subdomain] = tunnelID
 	}
-	if dbTunnel.PublicPort.Valid {
-		tunnel.PublicPort = dbTunnel.PublicPort.Int32
+	if dbTunnel.PublicPort != nil {
+		tunnel.PublicPort = *dbTunnel.PublicPort
 		tm.ports[tunnel.PublicPort] = tunnelID
 	}
 	

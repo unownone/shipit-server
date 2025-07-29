@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	_ "github.com/unwonone/shipit-server/docs" // Import generated docs
@@ -202,13 +201,9 @@ func initializeFirstAdmin(db *database.Database, passwordManager *auth.PasswordM
 		return fmt.Errorf("failed to create admin user: %w", err)
 	}
 
-	// Extract UUID for logging
-	var userID uuid.UUID
-	userID.Scan(adminUser.ID.Bytes)
-
 	log.WithFields(map[string]interface{}{
 		"email": adminUser.Email,
-		"user_id": userID.String(),
+		"user_id": adminUser.ID.String(),
 	}).Info("Created admin user")
 	
 	log.WithField("password", cfg.Secrets.Admin.Password).Warn("Admin password set - please change after first login")

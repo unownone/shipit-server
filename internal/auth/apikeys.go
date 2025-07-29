@@ -17,6 +17,7 @@ import (
 )
 
 const (
+	APIKeyAuthorizationHeader string = "X-API-KEY" // API KEY HEADER
 	APIKeyPrefix = "shipit_" // 7 bytes
 	APIKeyLength = 32 // Length of the random part
 )
@@ -24,12 +25,14 @@ const (
 // APIKeyManager handles API key generation, validation, and management
 type APIKeyManager struct {
 	db *database.Database
+	AuthHeader string
 }
 
 // NewAPIKeyManager creates a new API key manager
 func NewAPIKeyManager(db *database.Database) *APIKeyManager {
 	return &APIKeyManager{
 		db: db,
+		AuthHeader: APIKeyAuthorizationHeader,
 	}
 }
 
@@ -49,8 +52,8 @@ func (akm *APIKeyManager) GenerateAPIKey(ctx context.Context, userID uuid.UUID, 
 	keyHash := sha256.Sum256([]byte(fullKey))
 	keyHashString := base64.URLEncoding.EncodeToString(keyHash[:])
 
-	// Convert UUID to pgtype.UUID
-	var pgUserID pgtype.UUID
+	// Convert UUID to uuid.UUID
+	var pgUserID uuid.UUID
 	pgUserID.Scan(userID.String())
 
 	// Convert time to pgtype.Timestamptz
@@ -95,17 +98,7 @@ func (akm *APIKeyManager) ValidateAPIKey(ctx context.Context, key string) (*sqlc
 	}
 
 	// Get the associated user (the GetAPIKeyByHash already includes user info)
-	var userID uuid.UUID
-	err = userID.Scan(apiKeyRow.UserID.Bytes)
-	if err != nil {
-		return nil, nil, fmt.Errorf("invalid user ID")
-	}
-	
-	// Convert back to pgtype.UUID for the query
-	var pgUserIDForQuery pgtype.UUID
-	pgUserIDForQuery.Scan(userID.String())
-	
-	user, err := akm.db.Queries.GetUserByID(ctx, pgUserIDForQuery)
+	user, err := akm.db.Queries.GetUserByID(ctx, apiKeyRow.UserID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("user not found")
 	}
@@ -124,9 +117,7 @@ func (akm *APIKeyManager) ValidateAPIKey(ctx context.Context, key string) (*sqlc
 	err = akm.db.Queries.UpdateAPIKeyLastUsed(ctx, apiKeyRow.ID)
 	if err != nil {
 		// Log error but don't fail the validation
-		var keyUUID uuid.UUID
-		keyUUID.Scan(apiKeyRow.ID.Bytes)
-		logger.WithError(err).WithField("api_key_id", keyUUID.String()).Warn("Failed to update API key last used timestamp")
+		logger.WithError(err).WithField("api_key_id", apiKeyRow.ID.String()).Warn("Failed to update API key last used timestamp")
 	}
 
 	return &user, &apiKeyRow, nil
@@ -134,8 +125,8 @@ func (akm *APIKeyManager) ValidateAPIKey(ctx context.Context, key string) (*sqlc
 
 // ListAPIKeys returns all API keys for a user
 func (akm *APIKeyManager) ListAPIKeys(ctx context.Context, userID uuid.UUID) ([]sqlc.ListAPIKeysByUserRow, error) {
-	// Convert UUID to pgtype.UUID
-	var pgUserID pgtype.UUID
+	// Convert UUID to uuid.UUID
+	var pgUserID uuid.UUID
 	pgUserID.Scan(userID.String())
 
 	apiKeys, err := akm.db.Queries.ListAPIKeysByUser(ctx, pgUserID)
@@ -148,8 +139,8 @@ func (akm *APIKeyManager) ListAPIKeys(ctx context.Context, userID uuid.UUID) ([]
 
 // RevokeAPIKey revokes an API key
 func (akm *APIKeyManager) RevokeAPIKey(ctx context.Context, keyID, userID uuid.UUID) error {
-	// Convert UUIDs to pgtype.UUID
-	var pgKeyID, pgUserID pgtype.UUID
+	// Convert UUIDs to uuid.UUID
+	var pgKeyID, pgUserID uuid.UUID
 	pgKeyID.Scan(keyID.String())
 	pgUserID.Scan(userID.String())
 
@@ -166,8 +157,8 @@ func (akm *APIKeyManager) RevokeAPIKey(ctx context.Context, keyID, userID uuid.U
 
 // GetAPIKey returns a specific API key for a user
 func (akm *APIKeyManager) GetAPIKey(ctx context.Context, keyID, userID uuid.UUID) (*sqlc.ListAPIKeysByUserRow, error) {
-	// Convert UUID to pgtype.UUID
-	var pgUserID pgtype.UUID
+	// Convert UUID to uuid.UUID
+	var pgUserID uuid.UUID
 	pgUserID.Scan(userID.String())
 
 	// List all user keys and filter for the specific one
@@ -177,9 +168,7 @@ func (akm *APIKeyManager) GetAPIKey(ctx context.Context, keyID, userID uuid.UUID
 	}
 
 	for _, key := range apiKeys {
-		var keyUUID uuid.UUID
-		err := keyUUID.Scan(key.ID.Bytes)
-		if err == nil && keyUUID == keyID {
+		if key.ID == keyID {
 			return &key, nil
 		}
 	}
