@@ -11,22 +11,22 @@ import (
 // TunnelsTestSuite tests tunnel management endpoints
 type TunnelsTestSuite struct {
 	suite.Suite
-	*TestSuite
+	*testSuite
 }
 
 func (s *TunnelsTestSuite) SetupTest() {
-	s.TestSuite = SetupTestSuite(s.T())
+	s.testSuite = setupTestSuite(s.T())
 }
 
 func (s *TunnelsTestSuite) TearDownTest() {
-	s.TestSuite.TearDownTestSuite(s.T())
+	s.testSuite.TearDownTestSuite(s.T())
 }
 
 // TestCreateTunnel tests tunnel creation endpoint
 func (s *TunnelsTestSuite) TestCreateTunnel() {
 	tests := []struct {
 		name           string
-		user           *TestUser
+		user           *testUser
 		payload        map[string]interface{}
 		expectedStatus int
 		expectedError  string
@@ -156,7 +156,7 @@ func (s *TunnelsTestSuite) TestListTunnels() {
 
 	tests := []struct {
 		name           string
-		user           *TestUser
+		user           *testUser
 		expectedStatus int
 		expectedError  string
 		minTunnels     int
@@ -224,7 +224,7 @@ func (s *TunnelsTestSuite) TestGetTunnel() {
 
 	tests := []struct {
 		name           string
-		user           *TestUser
+		user           *testUser
 		tunnelID       string
 		expectedStatus int
 		expectedError  string
@@ -302,7 +302,7 @@ func (s *TunnelsTestSuite) TestDeleteTunnel() {
 
 	tests := []struct {
 		name           string
-		user           *TestUser
+		user           *testUser
 		tunnelID       string
 		expectedStatus int
 		expectedError  string
@@ -368,7 +368,7 @@ func (s *TunnelsTestSuite) TestGetTunnelStats() {
 
 	tests := []struct {
 		name           string
-		user           *TestUser
+		user           *testUser
 		tunnelID       string
 		expectedStatus int
 		expectedError  string

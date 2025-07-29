@@ -11,16 +11,18 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/unwonone/shipit-server/internal/database"
+	"github.com/unwonone/shipit-server/internal/logger"
 )
 
-// TunnelState represents the current state of a tunnel
-type TunnelState string
+// State represents the current state of a tunnel
+type State string
 
+// State constants
 const (
-	StateConnecting TunnelState = "connecting" // Agent is connecting
-	StateActive     TunnelState = "active"     // Tunnel is active and ready
-	StateIdle       TunnelState = "idle"       // Tunnel exists but no connections
-	StateTerminated TunnelState = "terminated" // Tunnel has been terminated
+	StateConnecting State = "connecting"
+	StateActive     State = "active"
+	StateIdle       State = "idle"
+	StateTerminated State = "terminated"
 )
 
 // ConnectionPool manages a pool of connections for a tunnel
@@ -39,7 +41,7 @@ type AgentConnection struct {
 	LastUsed    time.Time
 	IsHealthy   bool
 	RequestChan chan *ForwardRequest
-	mutex       sync.RWMutex
+	_           sync.RWMutex // TODO: Use this mutex for thread safety
 }
 
 // ForwardRequest represents a request to forward data through a tunnel
@@ -70,7 +72,7 @@ type Tunnel struct {
 	PublicPort   int32
 	TargetHost   string
 	TargetPort   int32
-	State        TunnelState
+	State        State
 	Pool         *ConnectionPool
 	CreatedAt    time.Time
 	LastActivity time.Time
@@ -84,8 +86,8 @@ type Tunnel struct {
 	mutex sync.RWMutex
 }
 
-// TunnelManager manages all active tunnels and their connection pools
-type TunnelManager struct {
+// Manager manages all active tunnels and their connection pools
+type Manager struct {
 	tunnels    map[uuid.UUID]*Tunnel
 	subdomains map[string]uuid.UUID // subdomain -> tunnel_id mapping
 	ports      map[int32]uuid.UUID  // port -> tunnel_id mapping
@@ -105,10 +107,10 @@ type TunnelManager struct {
 }
 
 // NewTunnelManager creates a new tunnel manager
-func NewTunnelManager(db *database.Database) *TunnelManager {
+func NewTunnelManager(db *database.Database) *Manager {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	tm := &TunnelManager{
+	tm := &Manager{
 		tunnels:    make(map[uuid.UUID]*Tunnel),
 		subdomains: make(map[string]uuid.UUID),
 		ports:      make(map[int32]uuid.UUID),
@@ -130,7 +132,7 @@ func NewTunnelManager(db *database.Database) *TunnelManager {
 }
 
 // RegisterTunnel registers a new tunnel from the database
-func (tm *TunnelManager) RegisterTunnel(ctx context.Context, tunnelID uuid.UUID) (*Tunnel, error) {
+func (tm *Manager) RegisterTunnel(ctx context.Context, tunnelID uuid.UUID) (*Tunnel, error) {
 	tm.mutex.Lock()
 	defer tm.mutex.Unlock()
 
@@ -141,7 +143,9 @@ func (tm *TunnelManager) RegisterTunnel(ctx context.Context, tunnelID uuid.UUID)
 
 	// Get tunnel from database
 	var pgTunnelID uuid.UUID
-	pgTunnelID.Scan(tunnelID.String())
+	if err := pgTunnelID.Scan(tunnelID.String()); err != nil {
+		return nil, fmt.Errorf("failed to scan tunnel ID: %w", err)
+	}
 
 	dbTunnel, err := tm.db.Queries.GetTunnelByID(ctx, pgTunnelID)
 	if err != nil {
@@ -179,7 +183,7 @@ func (tm *TunnelManager) RegisterTunnel(ctx context.Context, tunnelID uuid.UUID)
 }
 
 // AddConnection adds a new agent connection to a tunnel
-func (tm *TunnelManager) AddConnection(tunnelID uuid.UUID, conn net.Conn) (*AgentConnection, error) {
+func (tm *Manager) AddConnection(tunnelID uuid.UUID, conn net.Conn) (*AgentConnection, error) {
 	tm.mutex.RLock()
 	tunnel, exists := tm.tunnels[tunnelID]
 	tm.mutex.RUnlock()
@@ -220,7 +224,7 @@ func (tm *TunnelManager) AddConnection(tunnelID uuid.UUID, conn net.Conn) (*Agen
 }
 
 // RemoveConnection removes an agent connection from a tunnel
-func (tm *TunnelManager) RemoveConnection(tunnelID uuid.UUID, connectionID string) error {
+func (tm *Manager) RemoveConnection(tunnelID uuid.UUID, connectionID string) error {
 	tm.mutex.RLock()
 	tunnel, exists := tm.tunnels[tunnelID]
 	tm.mutex.RUnlock()
@@ -236,7 +240,9 @@ func (tm *TunnelManager) RemoveConnection(tunnelID uuid.UUID, connectionID strin
 	for i, conn := range tunnel.Pool.Connections {
 		if conn.ID == connectionID {
 			// Close the connection
-			conn.Conn.Close()
+			if err := conn.Conn.Close(); err != nil {
+				logger.Get().WithError(err).WithField("connection_id", conn.ID).Error("Failed to close connection")
+			}
 			close(conn.RequestChan)
 
 			// Remove from slice
@@ -260,7 +266,7 @@ func (tm *TunnelManager) RemoveConnection(tunnelID uuid.UUID, connectionID strin
 }
 
 // GetTunnelBySubdomain finds a tunnel by subdomain
-func (tm *TunnelManager) GetTunnelBySubdomain(subdomain string) (*Tunnel, error) {
+func (tm *Manager) GetTunnelBySubdomain(subdomain string) (*Tunnel, error) {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
 
@@ -278,7 +284,7 @@ func (tm *TunnelManager) GetTunnelBySubdomain(subdomain string) (*Tunnel, error)
 }
 
 // GetTunnelByPort finds a tunnel by public port
-func (tm *TunnelManager) GetTunnelByPort(port int32) (*Tunnel, error) {
+func (tm *Manager) GetTunnelByPort(port int32) (*Tunnel, error) {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
 
@@ -296,7 +302,7 @@ func (tm *TunnelManager) GetTunnelByPort(port int32) (*Tunnel, error) {
 }
 
 // ForwardRequest forwards a request through the tunnel using round-robin load balancing
-func (tm *TunnelManager) ForwardRequest(tunnelID uuid.UUID, req *ForwardRequest) (*ForwardResponse, error) {
+func (tm *Manager) ForwardRequest(tunnelID uuid.UUID, req *ForwardRequest) (*ForwardResponse, error) {
 	tm.mutex.RLock()
 	tunnel, exists := tm.tunnels[tunnelID]
 	tm.mutex.RUnlock()
@@ -354,7 +360,7 @@ func (tm *TunnelManager) ForwardRequest(tunnelID uuid.UUID, req *ForwardRequest)
 }
 
 // TerminateTunnel terminates a tunnel and closes all connections
-func (tm *TunnelManager) TerminateTunnel(tunnelID uuid.UUID) error {
+func (tm *Manager) TerminateTunnel(tunnelID uuid.UUID) error {
 	tm.mutex.Lock()
 	defer tm.mutex.Unlock()
 
@@ -366,7 +372,9 @@ func (tm *TunnelManager) TerminateTunnel(tunnelID uuid.UUID) error {
 	// Close all connections
 	tunnel.Pool.mutex.Lock()
 	for _, conn := range tunnel.Pool.Connections {
-		conn.Conn.Close()
+		if err := conn.Conn.Close(); err != nil {
+			logger.Get().WithError(err).WithField("connection_id", conn.ID).Error("Failed to close connection")
+		}
 		close(conn.RequestChan)
 	}
 	tunnel.Pool.Connections = nil
@@ -390,16 +398,16 @@ func (tm *TunnelManager) TerminateTunnel(tunnelID uuid.UUID) error {
 }
 
 // GetStats returns statistics for all tunnels
-func (tm *TunnelManager) GetStats() map[uuid.UUID]*TunnelStats {
+func (tm *Manager) GetStats() map[uuid.UUID]*Stats {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
 
-	stats := make(map[uuid.UUID]*TunnelStats)
+	stats := make(map[uuid.UUID]*Stats)
 	for id, tunnel := range tm.tunnels {
 		tunnel.mutex.RLock()
 		tunnel.Pool.mutex.RLock()
 
-		stats[id] = &TunnelStats{
+		stats[id] = &Stats{
 			TunnelID:        id,
 			State:           tunnel.State,
 			ConnectionCount: len(tunnel.Pool.Connections),
@@ -417,10 +425,10 @@ func (tm *TunnelManager) GetStats() map[uuid.UUID]*TunnelStats {
 	return stats
 }
 
-// TunnelStats represents tunnel statistics
-type TunnelStats struct {
+// Stats represents tunnel statistics
+type Stats struct {
 	TunnelID        uuid.UUID
-	State           TunnelState
+	State           State
 	ConnectionCount int
 	TotalRequests   int64
 	TotalBytesIn    int64
@@ -459,7 +467,7 @@ func (cp *ConnectionPool) getNextConnection() (*AgentConnection, error) {
 // Background workers
 
 // startBackgroundWorkers starts the background maintenance workers
-func (tm *TunnelManager) startBackgroundWorkers() {
+func (tm *Manager) startBackgroundWorkers() {
 	// Cleanup worker
 	tm.wg.Add(1)
 	go func() {
@@ -496,7 +504,7 @@ func (tm *TunnelManager) startBackgroundWorkers() {
 }
 
 // cleanupStaleConnections removes stale connections and tunnels
-func (tm *TunnelManager) cleanupStaleConnections() {
+func (tm *Manager) cleanupStaleConnections() {
 	tm.mutex.RLock()
 	tunnelsToCheck := make([]*Tunnel, 0, len(tm.tunnels))
 	for _, tunnel := range tm.tunnels {
@@ -519,26 +527,30 @@ func (tm *TunnelManager) cleanupStaleConnections() {
 
 		// Remove stale connections
 		for _, connID := range staleConnections {
-			tm.RemoveConnection(tunnel.ID, connID)
+			if err := tm.RemoveConnection(tunnel.ID, connID); err != nil {
+				logger.Get().WithError(err).WithField("connection_id", connID).Error("Failed to remove stale connection")
+			}
 		}
 	}
 }
 
 // sendHeartbeats sends heartbeat messages to all connections
-func (tm *TunnelManager) sendHeartbeats() {
+func (tm *Manager) sendHeartbeats() {
 	// TODO: Implement heartbeat sending to agent connections
 	// This will be implemented when we have the agent listener
 }
 
 // Shutdown gracefully shuts down the tunnel manager
-func (tm *TunnelManager) Shutdown() {
+func (tm *Manager) Shutdown() {
 	tm.cancel()
 	tm.wg.Wait()
 
 	// Close all tunnels
 	tm.mutex.Lock()
 	for tunnelID := range tm.tunnels {
-		tm.TerminateTunnel(tunnelID)
+		if err := tm.TerminateTunnel(tunnelID); err != nil {
+			logger.Get().WithError(err).WithField("tunnel_id", tunnelID).Error("Failed to terminate tunnel")
+		}
 	}
 	tm.mutex.Unlock()
 }

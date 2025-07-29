@@ -22,8 +22,8 @@ type Server struct {
 	db     *database.Database
 
 	// Core components
-	tunnelManager      *tunnel.TunnelManager
-	agentListener      *agent.AgentListener
+	tunnelManager      *tunnel.Manager
+	agentListener      *agent.Listener
 	httpProxy          *proxy.HTTPProxy
 	tcpProxy           *proxy.TCPProxy
 	analyticsCollector *analytics.Collector
@@ -45,7 +45,7 @@ func NewServer(db *database.Database, config *config.Config) *Server {
 	analyticsCollector := analytics.NewCollector(db)
 
 	// Create agent listener
-	agentListener := agent.NewAgentListener(tunnelManager, db, config)
+	agentListener := agent.NewListener(tunnelManager, db, config)
 
 	// Create proxy servers
 	httpProxy := proxy.NewHTTPProxy(tunnelManager, config)
@@ -150,7 +150,7 @@ func (s *Server) Stop() error {
 }
 
 // GetStats returns comprehensive statistics about all components
-func (s *Server) GetStats() *DataPlaneStats {
+func (s *Server) GetStats() *Stats {
 	tunnelStats := s.tunnelManager.GetStats()
 	agentStats := s.agentListener.GetStats()
 	httpStats := s.httpProxy.GetStats()
@@ -164,8 +164,8 @@ func (s *Server) GetStats() *DataPlaneStats {
 		totalConnections += int64(tunnelStat.ConnectionCount)
 	}
 
-	return &DataPlaneStats{
-		TunnelStats: DataPlaneTunnelStats{
+	return &Stats{
+		TunnelStats: TunnelStats{
 			TotalTunnels:     totalTunnels,
 			TotalConnections: totalConnections,
 			TotalRequests:    httpStats.TotalRequests + tcpStats.TotalConnections,
@@ -180,23 +180,23 @@ func (s *Server) GetStats() *DataPlaneStats {
 	}
 }
 
-// DataPlaneStats represents comprehensive data plane statistics
-type DataPlaneStats struct {
-	TunnelStats    DataPlaneTunnelStats     `json:"tunnel_stats"`
-	AgentStats     agent.AgentListenerStats `json:"agent_stats"`
+// Stats represents comprehensive data plane statistics
+type Stats struct {
+	TunnelStats    TunnelStats              `json:"tunnel_stats"`
+	AgentStats     agent.ListenerStats      `json:"agent_stats"`
 	HTTPStats      proxy.HTTPProxyStats     `json:"http_stats"`
 	TCPStats       proxy.TCPProxyStats      `json:"tcp_stats"`
 	AnalyticsStats analytics.CollectorStats `json:"analytics_stats"`
 }
 
-// DataPlaneTunnelStats represents aggregated tunnel statistics
-type DataPlaneTunnelStats struct {
-	TotalTunnels     int64                             `json:"total_tunnels"`
-	TotalConnections int64                             `json:"total_connections"`
-	TotalRequests    int64                             `json:"total_requests"`
-	TotalBytesIn     int64                             `json:"total_bytes_in"`
-	TotalBytesOut    int64                             `json:"total_bytes_out"`
-	Tunnels          map[uuid.UUID]*tunnel.TunnelStats `json:"tunnels"`
+// TunnelStats represents aggregated tunnel statistics
+type TunnelStats struct {
+	TotalTunnels     int64                       `json:"total_tunnels"`
+	TotalConnections int64                       `json:"total_connections"`
+	TotalRequests    int64                       `json:"total_requests"`
+	TotalBytesIn     int64                       `json:"total_bytes_in"`
+	TotalBytesOut    int64                       `json:"total_bytes_out"`
+	Tunnels          map[uuid.UUID]*tunnel.Stats `json:"tunnels"`
 }
 
 // CreateTCPListener creates a TCP listener for a tunnel
@@ -210,7 +210,7 @@ func (s *Server) RemoveTCPListener(port int32) error {
 }
 
 // GetTunnelManager returns the tunnel manager (for integration)
-func (s *Server) GetTunnelManager() *tunnel.TunnelManager {
+func (s *Server) GetTunnelManager() *tunnel.Manager {
 	return s.tunnelManager
 }
 
@@ -220,7 +220,7 @@ func (s *Server) GetAnalyticsCollector() *analytics.Collector {
 }
 
 // GetAgentListener returns the agent listener (for integration)
-func (s *Server) GetAgentListener() *agent.AgentListener {
+func (s *Server) GetAgentListener() *agent.Listener {
 	return s.agentListener
 }
 

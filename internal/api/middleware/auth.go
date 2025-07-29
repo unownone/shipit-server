@@ -1,3 +1,4 @@
+// Package middleware provides the authentication middleware for the application
 package middleware
 
 import (
@@ -199,13 +200,12 @@ func (am *AuthMiddleware) CombinedAuth() gin.HandlerFunc {
 				setAuthContext(c, result)
 				c.Next()
 				return
-			} else {
-				c.JSON(http.StatusUnauthorized, gin.H{
-					"error": "Invalid API key",
-				})
-				c.Abort()
-				return
 			}
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "Invalid API key",
+			})
+			c.Abort()
+			return
 		}
 
 		// if no auth header, return unauthorized

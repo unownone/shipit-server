@@ -12,6 +12,7 @@ import (
 	"github.com/unwonone/shipit-server/internal/config"
 	"github.com/unwonone/shipit-server/internal/database"
 	"github.com/unwonone/shipit-server/internal/database/sqlc"
+	"github.com/unwonone/shipit-server/internal/logger"
 )
 
 // UserHandler handles user-related API endpoints
@@ -204,7 +205,9 @@ func (h *UserHandler) Login(c *gin.Context) {
 	}
 
 	// Update last login
-	h.db.Queries.UpdateUserLastLogin(ctx, user.ID)
+	if err := h.db.Queries.UpdateUserLastLogin(ctx, user.ID); err != nil {
+		logger.WithError(err).WithField("user_id", user.ID).Error("Failed to update user last login")
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":       "Login successful",
@@ -265,7 +268,12 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 
 	// Convert UUID to uuid.UUID
 	var pgUserID uuid.UUID
-	pgUserID.Scan(userID.String())
+	if err := pgUserID.Scan(userID.String()); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to process user ID",
+		})
+		return
+	}
 
 	// Get current user
 	user, err := h.db.Queries.GetUserByID(ctx, pgUserID)

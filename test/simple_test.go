@@ -19,8 +19,8 @@ func TestSimpleContainerSetup(t *testing.T) {
 	ctx := context.Background()
 
 	// Start PostgreSQL container
-	postgresContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:15-alpine"),
+	postgresContainer, err := postgres.Run(ctx,
+		"postgres:15-alpine",
 		postgres.WithDatabase("shipit_test"),
 		postgres.WithUsername("shipit_test"),
 		postgres.WithPassword("test_password"),

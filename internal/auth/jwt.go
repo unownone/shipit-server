@@ -19,6 +19,7 @@ import (
 // UserRole represents user roles
 type UserRole string
 
+// JWTAuthorizationHeader is the authorization header for JWT tokens
 const (
 	JWTAuthorizationHeader string   = "Authorization"
 	RoleUser               UserRole = "user"
@@ -112,7 +113,9 @@ func (jm *JWTManager) generateRefreshToken(ctx context.Context, user *sqlc.Users
 	// Convert expiry time to pgtype.Timestamptz
 	var pgExpiresAt pgtype.Timestamptz
 	expiresAt := time.Now().Add(jm.config.RefreshTokenExpiry)
-	pgExpiresAt.Scan(expiresAt)
+	if err := pgExpiresAt.Scan(expiresAt); err != nil {
+		return "", fmt.Errorf("failed to scan expires at: %w", err)
+	}
 
 	// Create refresh token record in database
 	_, err = jm.db.Queries.CreateRefreshToken(ctx, sqlc.CreateRefreshTokenParams{
@@ -205,7 +208,9 @@ func (jm *JWTManager) RevokeRefreshToken(ctx context.Context, refreshTokenString
 func (jm *JWTManager) RevokeAllUserTokens(ctx context.Context, userID uuid.UUID) error {
 	// Convert UUID to uuid.UUID
 	var pgUserID uuid.UUID
-	pgUserID.Scan(userID.String())
+	if err := pgUserID.Scan(userID.String()); err != nil {
+		return fmt.Errorf("failed to scan user ID: %w", err)
+	}
 
 	err := jm.db.Queries.RevokeAllUserRefreshTokens(ctx, pgUserID)
 	if err != nil {
@@ -236,7 +241,9 @@ func (jm *JWTManager) GetUserFromToken(ctx context.Context, tokenString string) 
 
 	// Convert UUID to uuid.UUID for database query
 	var pgUserID uuid.UUID
-	pgUserID.Scan(claims.UserID.String())
+	if err := pgUserID.Scan(claims.UserID.String()); err != nil {
+		return nil, fmt.Errorf("failed to scan user ID: %w", err)
+	}
 
 	// Fetch the user from the database to get the latest information
 	// and ensure the user is still active

@@ -27,8 +27,8 @@ import (
 	"github.com/unwonone/shipit-server/internal/logger"
 )
 
-// TestSuite provides shared test infrastructure with testcontainers
-type TestSuite struct {
+// testSuite provides shared test infrastructure with testcontainers
+type testSuite struct {
 	DB              *database.Database
 	Config          *config.Config
 	Router          *gin.Engine
@@ -40,13 +40,13 @@ type TestSuite struct {
 	PostgresContainer *testcontainers.DockerContainer
 
 	// Test users for authentication
-	TestUser  *TestUser
-	TestUser2 *TestUser
-	AdminUser *TestUser
+	TestUser  *testUser
+	TestUser2 *testUser
+	AdminUser *testUser
 }
 
-// TestUser represents a test user with credentials
-type TestUser struct {
+// testUser represents a test user with credentials
+type testUser struct {
 	ID           uuid.UUID
 	Email        string
 	Password     string
@@ -64,8 +64,8 @@ type APIResponse struct {
 	Headers    http.Header
 }
 
-// SetupTestSuite initializes test infrastructure with testcontainers
-func SetupTestSuite(t *testing.T) *TestSuite {
+// setupTestSuite initializes test infrastructure with testcontainers
+func setupTestSuite(t *testing.T) *testSuite {
 	// Set Gin to test mode
 	gin.SetMode(gin.TestMode)
 
@@ -134,7 +134,9 @@ func SetupTestSuite(t *testing.T) *TestSuite {
 
 	// Set test log level if not already set
 	if os.Getenv("LOG_LEVEL") == "" {
-		os.Setenv("LOG_LEVEL", "info")
+		if err := os.Setenv("LOG_LEVEL", "info"); err != nil {
+			t.Logf("Failed to set LOG_LEVEL environment variable: %v", err)
+		}
 	}
 
 	// Initialize logger for tests
@@ -168,7 +170,7 @@ func SetupTestSuite(t *testing.T) *TestSuite {
 	// Setup routes
 	api.SetupRoutes(router, db, cfg, passwordManager, jwtManager, apiKeyManager)
 
-	suite := &TestSuite{
+	suite := &testSuite{
 		DB:                db,
 		Config:            cfg,
 		Router:            router,
@@ -185,7 +187,7 @@ func SetupTestSuite(t *testing.T) *TestSuite {
 }
 
 // TearDownTestSuite cleans up test infrastructure
-func (s *TestSuite) TearDownTestSuite(t *testing.T) {
+func (s *testSuite) TearDownTestSuite(t *testing.T) {
 	ctx := context.Background()
 
 	if s == nil || s.DB == nil {
@@ -194,13 +196,19 @@ func (s *TestSuite) TearDownTestSuite(t *testing.T) {
 
 	// Clean up test data
 	if s.TestUser != nil {
-		s.DB.Queries.DeactivateUser(ctx, s.TestUser.ID)
+		if err := s.DB.Queries.DeactivateUser(ctx, s.TestUser.ID); err != nil {
+			t.Logf("Failed to deactivate test user: %v", err)
+		}
 	}
 	if s.TestUser2 != nil {
-		s.DB.Queries.DeactivateUser(ctx, s.TestUser2.ID)
+		if err := s.DB.Queries.DeactivateUser(ctx, s.TestUser2.ID); err != nil {
+			t.Logf("Failed to deactivate test user 2: %v", err)
+		}
 	}
 	if s.AdminUser != nil {
-		s.DB.Queries.DeactivateUser(ctx, s.AdminUser.ID)
+		if err := s.DB.Queries.DeactivateUser(ctx, s.AdminUser.ID); err != nil {
+			t.Logf("Failed to deactivate admin user: %v", err)
+		}
 	}
 
 	// Close database connection
@@ -318,21 +326,21 @@ func findProjectRoot() (string, error) {
 }
 
 // createTestUsers creates test users for authentication
-func (s *TestSuite) createTestUsers(t *testing.T) {
+func (s *testSuite) createTestUsers(t *testing.T) {
 	ctx := context.Background()
 
 	// Create regular test user
-	s.TestUser = s.createUser(t, ctx, "test@example.com", "testpassword123", "Test User", string(auth.RoleUser))
+	s.TestUser = s.createUser(ctx, t, "test@example.com", "testpassword123", "Test User", string(auth.RoleUser))
 
 	// Create second test user
-	s.TestUser2 = s.createUser(t, ctx, "test2@example.com", "testpassword123", "Test User 2", string(auth.RoleUser))
+	s.TestUser2 = s.createUser(ctx, t, "test2@example.com", "testpassword123", "Test User 2", string(auth.RoleUser))
 
 	// Create admin user
-	s.AdminUser = s.createUser(t, ctx, "admin@example.com", "adminpassword123", "Admin User", string(auth.RoleAdmin))
+	s.AdminUser = s.createUser(ctx, t, "admin@example.com", "adminpassword123", "Admin User", string(auth.RoleAdmin))
 }
 
 // createUser creates a single test user
-func (s *TestSuite) createUser(t *testing.T, ctx context.Context, email, password, name, role string) *TestUser {
+func (s *testSuite) createUser(ctx context.Context, t *testing.T, email, password, name, role string) *testUser {
 	// Hash password
 	hashedPassword, err := s.PasswordManager.HashPassword(password)
 	require.NoError(t, err)
@@ -356,7 +364,7 @@ func (s *TestSuite) createUser(t *testing.T, ctx context.Context, email, passwor
 	_, apiKey, err := s.APIKeyManager.GenerateAPIKey(ctx, user.ID, "Test Key", nil)
 	require.NoError(t, err)
 
-	return &TestUser{
+	return &testUser{
 		ID:           user.ID,
 		Email:        email,
 		Password:     password,
@@ -369,7 +377,7 @@ func (s *TestSuite) createUser(t *testing.T, ctx context.Context, email, passwor
 }
 
 // MakeRequest makes an HTTP request and returns the response
-func (s *TestSuite) MakeRequest(method, path string, body interface{}, headers map[string]string) *APIResponse {
+func (s *testSuite) MakeRequest(method, path string, body interface{}, headers map[string]string) *APIResponse {
 	var reqBody []byte
 	if body != nil {
 		var err error
@@ -412,7 +420,7 @@ func (s *TestSuite) MakeRequest(method, path string, body interface{}, headers m
 }
 
 // MakeAuthenticatedRequest makes a request with JWT token
-func (s *TestSuite) MakeAuthenticatedRequest(method, path string, body interface{}, user *TestUser) *APIResponse {
+func (s *testSuite) MakeAuthenticatedRequest(method, path string, body interface{}, user *testUser) *APIResponse {
 	headers := map[string]string{
 		auth.JWTAuthorizationHeader: "Bearer " + user.AccessToken,
 	}
@@ -420,7 +428,7 @@ func (s *TestSuite) MakeAuthenticatedRequest(method, path string, body interface
 }
 
 // MakeAPIKeyRequest makes a request with API key
-func (s *TestSuite) MakeAPIKeyRequest(method, path string, body interface{}, user *TestUser) *APIResponse {
+func (s *testSuite) MakeAPIKeyRequest(method, path string, body interface{}, user *testUser) *APIResponse {
 	headers := map[string]string{
 		auth.APIKeyAuthorizationHeader: user.APIKey,
 	}
@@ -471,7 +479,7 @@ type ContainerInfo struct {
 }
 
 // GetContainerInfo returns information about running test containers
-func (s *TestSuite) GetContainerInfo(t *testing.T) *ContainerInfo {
+func (s *testSuite) GetContainerInfo(t *testing.T) *ContainerInfo {
 	ctx := context.Background()
 
 	host, err := s.PostgresContainer.Host(ctx)

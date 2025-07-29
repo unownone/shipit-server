@@ -16,22 +16,22 @@ import (
 // UsersTestSuite tests user management endpoints
 type UsersTestSuite struct {
 	suite.Suite
-	*TestSuite
+	*testSuite
 }
 
 func (s *UsersTestSuite) SetupTest() {
-	s.TestSuite = SetupTestSuite(s.T())
+	s.testSuite = setupTestSuite(s.T())
 }
 
 func (s *UsersTestSuite) TearDownTest() {
-	s.TestSuite.TearDownTestSuite(s.T())
+	s.testSuite.TearDownTestSuite(s.T())
 }
 
 // TestGetProfile tests getting user profile
 func (s *UsersTestSuite) TestGetProfile() {
 	tests := []struct {
 		name           string
-		user           *TestUser
+		user           *testUser
 		expectedStatus int
 		expectedError  string
 	}{
@@ -75,7 +75,7 @@ func (s *UsersTestSuite) TestGetProfile() {
 func (s *UsersTestSuite) TestUpdateProfile() {
 	tests := []struct {
 		name           string
-		user           *TestUser
+		user           *testUser
 		payload        map[string]interface{}
 		expectedStatus int
 		expectedError  string
@@ -182,7 +182,7 @@ func (s *UsersTestSuite) TestUpdateProfile() {
 func (s *UsersTestSuite) TestCreateAPIKey() {
 	tests := []struct {
 		name           string
-		user           *TestUser
+		user           *testUser
 		payload        map[string]interface{}
 		expectedStatus int
 		expectedError  string
@@ -249,7 +249,7 @@ func (s *UsersTestSuite) TestCreateAPIKey() {
 func (s *UsersTestSuite) TestListAPIKeys() {
 	tests := []struct {
 		name           string
-		user           *TestUser
+		user           *testUser
 		expectedStatus int
 		expectedError  string
 	}{
@@ -301,7 +301,7 @@ func (s *UsersTestSuite) TestRevokeAPIKey() {
 
 	tests := []struct {
 		name           string
-		user           *TestUser
+		user           *testUser
 		keyID          string
 		expectedStatus int
 		expectedError  string

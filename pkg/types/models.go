@@ -1,3 +1,4 @@
+// Package types provides the types for the models
 package types
 
 import (
@@ -120,7 +121,7 @@ type Connection struct {
 	EndedAt    *time.Time `json:"ended_at" db:"ended_at"`
 }
 
-// Role validation
+// IsValidRole validates the role
 func IsValidRole(role string) bool {
 	validRoles := []string{"user", "admin", "moderator"}
 	for _, validRole := range validRoles {
@@ -131,12 +132,12 @@ func IsValidRole(role string) bool {
 	return false
 }
 
-// Protocol validation
+// IsValidProtocol validates the protocol
 func IsValidProtocol(protocol string) bool {
 	return protocol == "http" || protocol == "tcp"
 }
 
-// Status validation
+// IsValidStatus validates the status
 func IsValidStatus(status string) bool {
 	validStatuses := []string{"active", "inactive", "terminated", "connecting", "error"}
 	for _, validStatus := range validStatuses {

@@ -1,3 +1,4 @@
+// Package api provides the API routes for the application
 package api
 
 import (

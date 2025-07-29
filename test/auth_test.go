@@ -1,3 +1,4 @@
+// Package test provides the authentication test suite
 package test
 
 import (
@@ -10,15 +11,15 @@ import (
 // AuthTestSuite tests authentication endpoints
 type AuthTestSuite struct {
 	suite.Suite
-	*TestSuite
+	*testSuite
 }
 
 func (s *AuthTestSuite) SetupTest() {
-	s.TestSuite = SetupTestSuite(s.T())
+	s.testSuite = setupTestSuite(s.T())
 }
 
 func (s *AuthTestSuite) TearDownTest() {
-	s.TestSuite.TearDownTestSuite(s.T())
+	s.testSuite.TearDownTestSuite(s.T())
 }
 
 // TestUserRegistration tests user registration endpoint
@@ -211,7 +212,7 @@ func (s *AuthTestSuite) TestRefreshToken() {
 func (s *AuthTestSuite) TestLogout() {
 	tests := []struct {
 		name           string
-		user           *TestUser
+		user           *testUser
 		expectedStatus int
 		expectedError  string
 	}{

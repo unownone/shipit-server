@@ -1,3 +1,4 @@
+// Package auth provides the API key management functionality
 package auth
 
 import (
@@ -16,10 +17,11 @@ import (
 	"github.com/unwonone/shipit-server/internal/logger"
 )
 
+// APIKey constants
 const (
-	APIKeyAuthorizationHeader string = "X-API-KEY" // API KEY HEADER
-	APIKeyPrefix                     = "shipit_"   // 7 bytes
-	APIKeyLength                     = 32          // Length of the random part
+	APIKeyAuthorizationHeader string = "X-API-KEY" // APIKeyAuthorizationHeader is the authorization header for API keys
+	APIKeyPrefix              string = "shipit_"   // APIKeyPrefix is the prefix for API keys
+	APIKeyLength              int    = 32          // APIKeyLength is the length of the random part of the API key
 )
 
 // APIKeyManager handles API key generation, validation, and management
@@ -54,12 +56,16 @@ func (akm *APIKeyManager) GenerateAPIKey(ctx context.Context, userID uuid.UUID, 
 
 	// Convert UUID to uuid.UUID
 	var pgUserID uuid.UUID
-	pgUserID.Scan(userID.String())
+	if err := pgUserID.Scan(userID.String()); err != nil {
+		return nil, "", fmt.Errorf("failed to scan user ID: %w", err)
+	}
 
 	// Convert time to pgtype.Timestamptz
 	var pgExpiresAt pgtype.Timestamptz
 	if expiresAt != nil {
-		pgExpiresAt.Scan(*expiresAt)
+		if err := pgExpiresAt.Scan(*expiresAt); err != nil {
+			return nil, "", fmt.Errorf("failed to scan expires at: %w", err)
+		}
 	}
 
 	// Create the API key record using SQLC
@@ -127,7 +133,9 @@ func (akm *APIKeyManager) ValidateAPIKey(ctx context.Context, key string) (*sqlc
 func (akm *APIKeyManager) ListAPIKeys(ctx context.Context, userID uuid.UUID) ([]sqlc.ListAPIKeysByUserRow, error) {
 	// Convert UUID to uuid.UUID
 	var pgUserID uuid.UUID
-	pgUserID.Scan(userID.String())
+	if err := pgUserID.Scan(userID.String()); err != nil {
+		return nil, fmt.Errorf("failed to scan user ID: %w", err)
+	}
 
 	apiKeys, err := akm.db.Queries.ListAPIKeysByUser(ctx, pgUserID)
 	if err != nil {
@@ -141,8 +149,12 @@ func (akm *APIKeyManager) ListAPIKeys(ctx context.Context, userID uuid.UUID) ([]
 func (akm *APIKeyManager) RevokeAPIKey(ctx context.Context, keyID, userID uuid.UUID) error {
 	// Convert UUIDs to uuid.UUID
 	var pgKeyID, pgUserID uuid.UUID
-	pgKeyID.Scan(keyID.String())
-	pgUserID.Scan(userID.String())
+	if err := pgKeyID.Scan(keyID.String()); err != nil {
+		return fmt.Errorf("failed to scan key ID: %w", err)
+	}
+	if err := pgUserID.Scan(userID.String()); err != nil {
+		return fmt.Errorf("failed to scan user ID: %w", err)
+	}
 
 	err := akm.db.Queries.RevokeAPIKey(ctx, sqlc.RevokeAPIKeyParams{
 		ID:     pgKeyID,
@@ -159,7 +171,9 @@ func (akm *APIKeyManager) RevokeAPIKey(ctx context.Context, keyID, userID uuid.U
 func (akm *APIKeyManager) GetAPIKey(ctx context.Context, keyID, userID uuid.UUID) (*sqlc.ListAPIKeysByUserRow, error) {
 	// Convert UUID to uuid.UUID
 	var pgUserID uuid.UUID
-	pgUserID.Scan(userID.String())
+	if err := pgUserID.Scan(userID.String()); err != nil {
+		return nil, fmt.Errorf("failed to scan user ID: %w", err)
+	}
 
 	// List all user keys and filter for the specific one
 	apiKeys, err := akm.db.Queries.ListAPIKeysByUser(ctx, pgUserID)
@@ -187,7 +201,7 @@ func (akm *APIKeyManager) CleanupExpiredKeys(ctx context.Context) error {
 }
 
 // UpdateAPIKeyName updates the name of an API key (not implemented in SQLC queries)
-func (akm *APIKeyManager) UpdateAPIKeyName(ctx context.Context, keyID, userID uuid.UUID, newName string) error {
+func (akm *APIKeyManager) UpdateAPIKeyName(_ context.Context, _, _ uuid.UUID, _ string) error {
 	// This would need a custom SQL query to be added to the queries
 	return fmt.Errorf("update API key name not implemented - needs custom SQL query")
 }

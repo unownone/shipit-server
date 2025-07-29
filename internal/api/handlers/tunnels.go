@@ -23,6 +23,7 @@ import (
 // TunnelProtocol represents supported tunnel protocols
 type TunnelProtocol string
 
+// Protocol constants
 const (
 	ProtocolHTTP TunnelProtocol = "http"
 	ProtocolTCP  TunnelProtocol = "tcp"
@@ -31,6 +32,7 @@ const (
 // TunnelStatus represents tunnel status
 type TunnelStatus string
 
+// Status constants
 const (
 	StatusActive     TunnelStatus = "active"
 	StatusInactive   TunnelStatus = "inactive"
@@ -190,7 +192,12 @@ func (h *TunnelHandler) CreateTunnel(c *gin.Context) {
 				// Generate random subdomain
 				subdomainStr = h.generateRandomSubdomain(ctx)
 			}
-			subdomain.Scan(subdomainStr)
+			if err := subdomain.Scan(subdomainStr); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": "Failed to process subdomain",
+				})
+				return
+			}
 			publicURL = fmt.Sprintf("https://%s.%s", subdomainStr, h.config.Tunnels.DomainHost)
 
 		}
@@ -212,7 +219,12 @@ func (h *TunnelHandler) CreateTunnel(c *gin.Context) {
 	// Set default TTL if not provided
 	defaultExpiry := time.Now().Add(h.config.Tunnels.DefaultTTL)
 	var pgExpiresAt pgtype.Timestamptz
-	pgExpiresAt.Scan(defaultExpiry)
+	if err := pgExpiresAt.Scan(defaultExpiry); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to process expiry time",
+		})
+		return
+	}
 
 	// Generate tunnel name if not provided
 	tunnelName := fmt.Sprintf("%s-tunnel-%s", string(req.Protocol), time.Now().Format("20060102-150405"))
@@ -290,7 +302,12 @@ func (h *TunnelHandler) ListTunnels(c *gin.Context) {
 
 	// Convert UUID to uuid.UUID
 	var pgUserID uuid.UUID
-	pgUserID.Scan(userID.String())
+	if err := pgUserID.Scan(userID.String()); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to process user ID",
+		})
+		return
+	}
 
 	// Get tunnels
 	tunnels, err := h.db.Queries.ListTunnelsByUser(ctx, sqlc.ListTunnelsByUserParams{
@@ -352,7 +369,12 @@ func (h *TunnelHandler) GetTunnel(c *gin.Context) {
 
 	// Convert UUIDs to uuid.UUID
 	var pgTunnelID uuid.UUID
-	pgTunnelID.Scan(tunnelID.String())
+	if err := pgTunnelID.Scan(tunnelID.String()); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to process tunnel ID",
+		})
+		return
+	}
 
 	// Get tunnel and verify ownership
 	tunnel, err := h.db.Queries.GetTunnelByID(ctx, pgTunnelID)
@@ -398,8 +420,18 @@ func (h *TunnelHandler) DeleteTunnel(c *gin.Context) {
 
 	// Convert UUIDs to uuid.UUID
 	var pgTunnelID, pgUserID uuid.UUID
-	pgTunnelID.Scan(tunnelID.String())
-	pgUserID.Scan(userID.String())
+	if err := pgTunnelID.Scan(tunnelID.String()); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to process tunnel ID",
+		})
+		return
+	}
+	if err := pgUserID.Scan(userID.String()); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to process user ID",
+		})
+		return
+	}
 
 	// Verify tunnel exists and ownership
 	tunnel, err := h.db.Queries.GetTunnelByID(ctx, pgTunnelID)
@@ -466,7 +498,12 @@ func (h *TunnelHandler) GetTunnelStats(c *gin.Context) {
 
 	// Convert UUIDs to uuid.UUID
 	var pgTunnelID uuid.UUID
-	pgTunnelID.Scan(tunnelID.String())
+	if err := pgTunnelID.Scan(tunnelID.String()); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to process tunnel ID",
+		})
+		return
+	}
 
 	// Verify tunnel ownership
 	tunnel, err := h.db.Queries.GetTunnelByID(ctx, pgTunnelID)

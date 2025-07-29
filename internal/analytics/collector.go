@@ -21,7 +21,7 @@ type Collector struct {
 
 	// In-memory metrics before batch insert
 	metricsBatch map[uuid.UUID]*TunnelMetrics
-	eventQueue   chan *AnalyticsEvent
+	eventQueue   chan *Event
 
 	// Configuration
 	batchSize       int
@@ -42,8 +42,8 @@ type Collector struct {
 	errors          int64
 }
 
-// AnalyticsEvent represents a single analytics event
-type AnalyticsEvent struct {
+// Event represents a single analytics event
+type Event struct {
 	TunnelID     uuid.UUID
 	EventType    EventType
 	Timestamp    time.Time
@@ -87,6 +87,7 @@ type TunnelMetrics struct {
 // EventType represents different types of analytics events
 type EventType string
 
+// EventType constants
 const (
 	EventTypeRequest    EventType = "request"
 	EventTypeResponse   EventType = "response"
@@ -102,7 +103,7 @@ func NewCollector(db *database.Database) *Collector {
 	collector := &Collector{
 		db:           db,
 		metricsBatch: make(map[uuid.UUID]*TunnelMetrics),
-		eventQueue:   make(chan *AnalyticsEvent, 10000), // 10k event buffer
+		eventQueue:   make(chan *Event, 10000), // 10k event buffer
 
 		// Default configuration
 		batchSize:       100,
@@ -163,7 +164,7 @@ func (c *Collector) Stop() error {
 }
 
 // RecordEvent records an analytics event
-func (c *Collector) RecordEvent(event *AnalyticsEvent) {
+func (c *Collector) RecordEvent(event *Event) {
 	if event == nil {
 		return
 	}
@@ -190,7 +191,7 @@ func (c *Collector) RecordEvent(event *AnalyticsEvent) {
 
 // RecordHTTPRequest records an HTTP request event
 func (c *Collector) RecordHTTPRequest(tunnelID uuid.UUID, requestID, connectionID, method, path string, bytesIn int64, clientIP, userAgent string) {
-	event := &AnalyticsEvent{
+	event := &Event{
 		TunnelID:     tunnelID,
 		EventType:    EventTypeRequest,
 		RequestID:    requestID,
@@ -206,7 +207,7 @@ func (c *Collector) RecordHTTPRequest(tunnelID uuid.UUID, requestID, connectionI
 
 // RecordHTTPResponse records an HTTP response event
 func (c *Collector) RecordHTTPResponse(tunnelID uuid.UUID, requestID string, statusCode int, bytesOut int64, responseTime time.Duration) {
-	event := &AnalyticsEvent{
+	event := &Event{
 		TunnelID:     tunnelID,
 		EventType:    EventTypeResponse,
 		RequestID:    requestID,
@@ -219,7 +220,7 @@ func (c *Collector) RecordHTTPResponse(tunnelID uuid.UUID, requestID string, sta
 
 // RecordTCPConnection records a TCP connection event
 func (c *Collector) RecordTCPConnection(tunnelID uuid.UUID, connectionID string, bytesIn, bytesOut int64, duration time.Duration, clientIP string) {
-	event := &AnalyticsEvent{
+	event := &Event{
 		TunnelID:     tunnelID,
 		EventType:    EventTypeConnection,
 		ConnectionID: connectionID,
@@ -234,7 +235,7 @@ func (c *Collector) RecordTCPConnection(tunnelID uuid.UUID, connectionID string,
 
 // RecordError records an error event
 func (c *Collector) RecordError(tunnelID uuid.UUID, requestID, errorMessage string, metadata map[string]interface{}) {
-	event := &AnalyticsEvent{
+	event := &Event{
 		TunnelID:     tunnelID,
 		EventType:    EventTypeError,
 		RequestID:    requestID,
@@ -334,7 +335,7 @@ func (c *Collector) processEvents() {
 }
 
 // processEvent processes a single event
-func (c *Collector) processEvent(event *AnalyticsEvent) {
+func (c *Collector) processEvent(event *Event) {
 	c.mutex.Lock()
 	metrics, exists := c.metricsBatch[event.TunnelID]
 	if !exists {
@@ -460,7 +461,9 @@ func (c *Collector) saveMetrics(ctx context.Context, metrics *TunnelMetrics) err
 
 	// Convert UUID to uuid.UUID
 	var pgTunnelID uuid.UUID
-	pgTunnelID.Scan(metrics.TunnelID.String())
+	if err := pgTunnelID.Scan(metrics.TunnelID.String()); err != nil {
+		return fmt.Errorf("failed to scan tunnel ID: %w", err)
+	}
 
 	// Calculate average response time
 	var avgResponseTime float32
@@ -510,18 +513,18 @@ func (c *Collector) processFinalBatch() {
 
 // copyMap creates a copy of an int64 map
 func copyMap(original map[int]int64) map[int]int64 {
-	copy := make(map[int]int64)
+	result := make(map[int]int64)
 	for k, v := range original {
-		copy[k] = v
+		result[k] = v
 	}
-	return copy
+	return result
 }
 
 // copyStringMap creates a copy of a string map
 func copyStringMap(original map[string]int64) map[string]int64 {
-	copy := make(map[string]int64)
+	result := make(map[string]int64)
 	for k, v := range original {
-		copy[k] = v
+		result[k] = v
 	}
-	return copy
+	return result
 }

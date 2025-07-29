@@ -1,3 +1,4 @@
+// Package handlers provides the API handlers for the analytics endpoints
 package handlers
 
 import (
@@ -127,7 +128,12 @@ func (h *AnalyticsHandler) GetOverview(c *gin.Context) {
 
 	// Convert UUID to uuid.UUID
 	var pgUserID uuid.UUID
-	pgUserID.Scan(userID.String())
+	if err := pgUserID.Scan(userID.String()); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to process user ID",
+		})
+		return
+	}
 
 	// Get total tunnels count
 	totalTunnels, err := h.db.Queries.CountTunnelsByUser(ctx, pgUserID)
@@ -207,7 +213,12 @@ func (h *AnalyticsHandler) GetTunnelStats(c *gin.Context) {
 
 	// Convert UUIDs
 	var pgTunnelID uuid.UUID
-	pgTunnelID.Scan(tunnelID.String())
+	if err := pgTunnelID.Scan(tunnelID.String()); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to process tunnel ID",
+		})
+		return
+	}
 
 	// Verify tunnel ownership
 	tunnel, err := h.db.Queries.GetTunnelByID(ctx, pgTunnelID)

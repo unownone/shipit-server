@@ -1,3 +1,4 @@
+// Package database provides the database connection and queries
 package database
 
 import (
@@ -92,7 +93,11 @@ func (db *Database) WithTx(ctx context.Context, fn func(*sqlc.Queries) error) er
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		if err := tx.Rollback(ctx); err != nil {
+			logger.Get().WithError(err).Error("Failed to rollback transaction")
+		}
+	}()
 
 	queries := db.Queries.WithTx(tx)
 	if err := fn(queries); err != nil {
@@ -107,7 +112,7 @@ func (db *Database) WithTx(ctx context.Context, fn func(*sqlc.Queries) error) er
 }
 
 // RunMigrations applies database migrations using Atlas
-func (db *Database) RunMigrations(ctx context.Context) error {
+func (db *Database) RunMigrations(_ context.Context) error {
 	// For now, we'll implement a simple version
 	// In production, you'd use Atlas CLI or the Atlas Go SDK
 	logger.Get().Info("Migration system using Atlas CLI - run 'atlas migrate apply --env dev' manually")

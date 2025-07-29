@@ -21,7 +21,7 @@ import (
 
 // HTTPProxy handles HTTP/HTTPS traffic routing to tunnels
 type HTTPProxy struct {
-	tunnelManager *tunnel.TunnelManager
+	tunnelManager *tunnel.Manager
 	config        *config.Config
 
 	// HTTP servers
@@ -57,7 +57,7 @@ type RequestContext struct {
 }
 
 // NewHTTPProxy creates a new HTTP proxy
-func NewHTTPProxy(tunnelManager *tunnel.TunnelManager, config *config.Config) *HTTPProxy {
+func NewHTTPProxy(tunnelManager *tunnel.Manager, config *config.Config) *HTTPProxy {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &HTTPProxy{
@@ -221,7 +221,9 @@ func (hp *HTTPProxy) handleHTTPRequest(w http.ResponseWriter, r *http.Request) {
 		hp.handleError(w, reqCtx, http.StatusBadRequest, "Failed to read request body", err)
 		return
 	}
-	r.Body.Close()
+	if err := r.Body.Close(); err != nil {
+		logger.WithError(err).Error("Failed to close request body")
+	}
 
 	// Create forward request
 	forwardReq := &tunnel.ForwardRequest{
@@ -309,7 +311,9 @@ func (hp *HTTPProxy) handleError(w http.ResponseWriter, reqCtx *RequestContext, 
 
 	// Write error page
 	errorHTML := hp.generateErrorPage(statusCode, message, reqCtx)
-	w.Write([]byte(errorHTML))
+	if _, err := w.Write([]byte(errorHTML)); err != nil {
+		logger.WithError(err).Error("Failed to write error response")
+	}
 }
 
 // handleResponse handles successful responses from tunnels
@@ -457,7 +461,7 @@ func (hp *HTTPProxy) CreateReverseProxy(tunnelID uuid.UUID) *httputil.ReversePro
 			tunnelManager: hp.tunnelManager,
 			tunnelID:      tunnelID,
 		},
-		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
 			logger.WithError(err).Error("Reverse proxy error")
 			http.Error(w, "Bad Gateway", http.StatusBadGateway)
 		},
@@ -466,7 +470,7 @@ func (hp *HTTPProxy) CreateReverseProxy(tunnelID uuid.UUID) *httputil.ReversePro
 
 // TunnelTransport implements http.RoundTripper for tunnel communication
 type TunnelTransport struct {
-	tunnelManager *tunnel.TunnelManager
+	tunnelManager *tunnel.Manager
 	tunnelID      uuid.UUID
 }
 
@@ -480,7 +484,9 @@ func (tt *TunnelTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 		if err != nil {
 			return nil, fmt.Errorf("failed to read request body: %w", err)
 		}
-		req.Body.Close()
+		if err := req.Body.Close(); err != nil {
+			logger.WithError(err).Error("Failed to close request body")
+		}
 	}
 
 	// Create forward request

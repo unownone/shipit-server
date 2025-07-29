@@ -10,15 +10,15 @@ import (
 // HealthAnalyticsTestSuite tests health and analytics endpoints
 type HealthAnalyticsTestSuite struct {
 	suite.Suite
-	*TestSuite
+	*testSuite
 }
 
 func (s *HealthAnalyticsTestSuite) SetupTest() {
-	s.TestSuite = SetupTestSuite(s.T())
+	s.testSuite = setupTestSuite(s.T())
 }
 
 func (s *HealthAnalyticsTestSuite) TearDownTest() {
-	s.TestSuite.TearDownTestSuite(s.T())
+	s.testSuite.TearDownTestSuite(s.T())
 }
 
 // TestHealthCheck tests the health check endpoint
@@ -34,7 +34,7 @@ func (s *HealthAnalyticsTestSuite) TestHealthCheck() {
 func (s *HealthAnalyticsTestSuite) TestGetAnalyticsOverview() {
 	tests := []struct {
 		name           string
-		user           *TestUser
+		user           *testUser
 		queryParams    string
 		expectedStatus int
 		expectedError  string
@@ -100,7 +100,7 @@ func (s *HealthAnalyticsTestSuite) TestGetAnalyticsOverview() {
 func (s *HealthAnalyticsTestSuite) TestGetTrafficAnalytics() {
 	tests := []struct {
 		name           string
-		user           *TestUser
+		user           *testUser
 		queryParams    string
 		expectedStatus int
 		expectedError  string
@@ -168,7 +168,7 @@ func (s *HealthAnalyticsTestSuite) TestGetTunnelAnalytics() {
 
 	tests := []struct {
 		name           string
-		user           *TestUser
+		user           *testUser
 		tunnelID       string
 		queryParams    string
 		expectedStatus int

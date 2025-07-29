@@ -17,7 +17,7 @@ import (
 
 // TCPProxy handles TCP traffic routing to tunnels
 type TCPProxy struct {
-	tunnelManager *tunnel.TunnelManager
+	tunnelManager *tunnel.Manager
 	config        *config.Config
 
 	// Active listeners for TCP tunnels
@@ -72,7 +72,7 @@ type TCPConnection struct {
 }
 
 // NewTCPProxy creates a new TCP proxy
-func NewTCPProxy(tunnelManager *tunnel.TunnelManager, config *config.Config) *TCPProxy {
+func NewTCPProxy(tunnelManager *tunnel.Manager, config *config.Config) *TCPProxy {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &TCPProxy{
@@ -240,7 +240,11 @@ type TCPListenerStats struct {
 
 // Start starts accepting connections on the TCP listener
 func (tl *TCPListener) Start() {
-	defer tl.Listener.Close()
+	defer func() {
+		if err := tl.Listener.Close(); err != nil {
+			logger.WithError(err).WithField("port", tl.Port).Error("Failed to close TCP listener")
+		}
+	}()
 
 	logger.WithField("port", tl.Port).Info("TCP listener started")
 
@@ -251,7 +255,9 @@ func (tl *TCPListener) Start() {
 		default:
 			// Set accept timeout to allow for graceful shutdown
 			if tcpListener, ok := tl.Listener.(*net.TCPListener); ok {
-				tcpListener.SetDeadline(time.Now().Add(1 * time.Second))
+				if err := tcpListener.SetDeadline(time.Now().Add(1 * time.Second)); err != nil {
+					logger.WithError(err).WithField("port", tl.Port).Error("Failed to set TCP listener deadline")
+				}
 			}
 
 			conn, err := tl.Listener.Accept()
@@ -281,14 +287,20 @@ func (tl *TCPListener) Start() {
 // Stop stops the TCP listener
 func (tl *TCPListener) Stop() {
 	tl.cancel()
-	tl.Listener.Close()
+	if err := tl.Listener.Close(); err != nil {
+		logger.WithError(err).WithField("port", tl.Port).Error("Failed to close TCP listener")
+	}
 	tl.wg.Wait()
 	logger.WithField("port", tl.Port).Info("TCP listener stopped")
 }
 
 // handleConnection handles a new TCP connection
 func (tl *TCPListener) handleConnection(clientConn net.Conn) {
-	defer clientConn.Close()
+	defer func() {
+		if err := clientConn.Close(); err != nil {
+			logger.WithError(err).Error("Failed to close client connection")
+		}
+	}()
 
 	// Update statistics
 	tl.mutex.Lock()
@@ -378,11 +390,15 @@ func (tc *TCPConnection) startProxy(tunnelObj *tunnel.Tunnel, listener *TCPListe
 	tc.wg.Add(1)
 	go func() {
 		defer tc.wg.Done()
-		defer clientWriter.Close()
+		defer func() {
+			if err := clientWriter.Close(); err != nil {
+				logger.WithError(err).WithField("connection_id", tc.ID).Error("Failed to close client writer")
+			}
+		}()
 
 		bytesRead, err := io.Copy(clientWriter, tc.ClientConn)
 		if err != nil && tc.ctx.Err() == nil {
-			logger.WithField("connection_id", tc.ID).Errorf("TCP connection %s: client->tunnel copy error: %v", err)
+			logger.WithField("connection_id", tc.ID).WithError(err).Error("TCP connection: client->tunnel copy error")
 		}
 
 		tc.BytesIn += bytesRead
@@ -399,11 +415,15 @@ func (tc *TCPConnection) startProxy(tunnelObj *tunnel.Tunnel, listener *TCPListe
 	tc.wg.Add(1)
 	go func() {
 		defer tc.wg.Done()
-		defer tunnelWriter.Close()
+		defer func() {
+			if err := tunnelWriter.Close(); err != nil {
+				logger.WithError(err).WithField("connection_id", tc.ID).Error("Failed to close tunnel writer")
+			}
+		}()
 
 		bytesWritten, err := io.Copy(tc.ClientConn, tunnelReader)
 		if err != nil && tc.ctx.Err() == nil {
-			logger.WithField("connection_id", tc.ID).Errorf("TCP connection %s: tunnel->client copy error: %v", err)
+			logger.WithField("connection_id", tc.ID).WithError(err).Error("TCP connection: tunnel->client copy error")
 		}
 
 		tc.BytesOut += bytesWritten
@@ -420,8 +440,16 @@ func (tc *TCPConnection) startProxy(tunnelObj *tunnel.Tunnel, listener *TCPListe
 	tc.wg.Add(1)
 	go func() {
 		defer tc.wg.Done()
-		defer clientReader.Close()
-		defer tunnelReader.Close()
+		defer func() {
+			if err := clientReader.Close(); err != nil {
+				logger.WithError(err).WithField("connection_id", tc.ID).Error("Failed to close client reader")
+			}
+		}()
+		defer func() {
+			if err := tunnelReader.Close(); err != nil {
+				logger.WithError(err).WithField("connection_id", tc.ID).Error("Failed to close tunnel reader")
+			}
+		}()
 
 		tc.handleTunnelForwarding(tunnelObj, clientReader, tunnelWriter)
 	}()
@@ -432,7 +460,7 @@ func (tc *TCPConnection) startProxy(tunnelObj *tunnel.Tunnel, listener *TCPListe
 }
 
 // handleTunnelForwarding handles the actual forwarding through the tunnel
-func (tc *TCPConnection) handleTunnelForwarding(tunnelObj *tunnel.Tunnel, clientReader io.Reader, tunnelWriter io.Writer) {
+func (tc *TCPConnection) handleTunnelForwarding(_ *tunnel.Tunnel, clientReader io.Reader, tunnelWriter io.Writer) {
 	// TODO: Implement proper TCP tunnel forwarding
 	// Current limitation: TCP requires streaming protocol, not HTTP-style request/response
 	// For now, we'll do a simple passthrough to maintain the interface
@@ -451,7 +479,7 @@ func (tc *TCPConnection) handleTunnelForwarding(tunnelObj *tunnel.Tunnel, client
 			n, err := clientReader.Read(buffer)
 			if err != nil {
 				if err != io.EOF && tc.ctx.Err() == nil {
-					logger.WithField("connection_id", tc.ID).Errorf("TCP connection %s: read error: %v", err)
+					logger.WithField("connection_id", tc.ID).WithError(err).Error("TCP connection: read error")
 				}
 				return
 			}
