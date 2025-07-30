@@ -71,6 +71,12 @@ type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
+// ChangePasswordRequest represents a password change request
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required,min=8"`
+}
+
 // Register handles user registration
 // @Summary Register a new user
 // @Description Register a new user account
@@ -516,5 +522,77 @@ func (h *UserHandler) RevokeAPIKey(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "API key revoked successfully",
+	})
+}
+
+// ChangePassword handles password change
+func (h *UserHandler) ChangePassword(c *gin.Context) {
+	userID, exists := middleware.GetCurrentUserID(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "User not authenticated",
+		})
+		return
+	}
+
+	var req ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request data",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	// Get current user
+	user, err := h.db.Queries.GetUserByID(ctx, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to get user information",
+		})
+		return
+	}
+
+	// Verify current password
+	if err := h.passwordManager.VerifyPassword(req.CurrentPassword, user.PasswordHash); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "Current password is incorrect",
+		})
+		return
+	}
+
+	// Validate new password
+	if err := h.passwordManager.IsPasswordValid(req.NewPassword); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	// Hash new password
+	hashedPassword, err := h.passwordManager.HashPassword(req.NewPassword)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to hash password",
+		})
+		return
+	}
+
+	// Update password in database
+	err = h.db.Queries.UpdateUserPassword(ctx, sqlc.UpdateUserPasswordParams{
+		ID:           userID,
+		PasswordHash: hashedPassword,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to update password",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Password changed successfully",
 	})
 }

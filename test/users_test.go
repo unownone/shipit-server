@@ -106,7 +106,7 @@ func (s *UsersTestSuite) TestUpdateProfile() {
 				"email": "invalid-email",
 			},
 			expectedStatus: 400,
-			expectedError:  "Invalid request data",
+			expectedError:  "Invalid email format",
 		},
 		{
 			name: "update profile without authentication",
@@ -180,7 +180,7 @@ func (s *UsersTestSuite) TestChangePassword() {
 				"new_password":     "123",
 			},
 			expectedStatus: 400,
-			expectedError:  "Password is too weak",
+			expectedError:  "Invalid request data",
 		},
 		{
 			name: "change password without authentication",
@@ -271,12 +271,13 @@ func (s *UsersTestSuite) TestCreateAPIKey() {
 
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
-				assert.Contains(s.T(), resp.Body, "api_key_id")
 				assert.Contains(s.T(), resp.Body, "api_key")
-				assert.Contains(s.T(), resp.Body, "name")
-				if description, ok := test.payload["description"]; ok {
-					assert.Equal(s.T(), description, resp.Body["description"])
-				}
+				assert.Contains(s.T(), resp.Body, "message")
+				apiKey := resp.Body["api_key"].(map[string]interface{})
+				assert.Contains(s.T(), apiKey, "id")
+				assert.Contains(s.T(), apiKey, "name")
+				assert.Contains(s.T(), apiKey, "key")
+				assert.Contains(s.T(), apiKey, "prefix")
 			} else {
 				AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
 			}
@@ -329,11 +330,12 @@ func (s *UsersTestSuite) TestListAPIKeys() {
 
 				if len(apiKeys) > 0 {
 					apiKey := apiKeys[0].(map[string]interface{})
-					assert.Contains(s.T(), apiKey, "api_key_id")
+					assert.Contains(s.T(), apiKey, "id")
 					assert.Contains(s.T(), apiKey, "name")
 					assert.Contains(s.T(), apiKey, "created_at")
+					assert.Contains(s.T(), apiKey, "prefix")
 					// Note: API key value is not returned in list
-					assert.NotContains(s.T(), apiKey, "api_key")
+					assert.NotContains(s.T(), apiKey, "key")
 				}
 			} else {
 				AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
@@ -350,7 +352,8 @@ func (s *UsersTestSuite) TestRevokeAPIKey() {
 		"description": "API key for revocation test",
 	}, s.testSuite.TestUser)
 	assert.Equal(s.T(), 201, createResp.StatusCode)
-	apiKeyID := createResp.Body["api_key_id"].(string)
+	apiKey := createResp.Body["api_key"].(map[string]interface{})
+	apiKeyID := apiKey["id"].(string)
 
 	tests := []struct {
 		name           string
@@ -369,8 +372,8 @@ func (s *UsersTestSuite) TestRevokeAPIKey() {
 			name:           "revoke non-existent API key",
 			user:           s.testSuite.TestUser,
 			apiKeyID:       "non-existent-api-key-id",
-			expectedStatus: 404,
-			expectedError:  "API key not found",
+			expectedStatus: 400,
+			expectedError:  "Invalid API key ID",
 		},
 		{
 			name:           "revoke API key without authentication",

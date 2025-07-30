@@ -66,6 +66,7 @@ func SetupRoutes(
 		// User profile management
 		jwtProtected.GET("/users/profile", userHandler.GetProfile)
 		jwtProtected.PUT("/users/profile", userHandler.UpdateProfile)
+		jwtProtected.PUT("/users/password", userHandler.ChangePassword)
 		jwtProtected.POST("/users/logout", userHandler.Logout)
 
 		// API key management
@@ -76,6 +77,7 @@ func SetupRoutes(
 		// Analytics endpoints (JWT auth for web dashboard)
 		jwtProtected.GET("/analytics/overview", analyticsHandler.GetOverview)
 		jwtProtected.GET("/analytics/traffic", analyticsHandler.GetTrafficAnalytics)
+		jwtProtected.GET("/analytics/tunnels/:tunnel_id/stats", analyticsHandler.GetTunnelStats)
 	}
 
 	// API key protected endpoints (for CLI agents and web users)
@@ -101,7 +103,6 @@ func SetupRoutes(
 		combinedAuth.GET("/tunnels/:tunnel_id", tunnelHandler.GetTunnel)
 		combinedAuth.DELETE("/tunnels/:tunnel_id", tunnelHandler.DeleteTunnel)
 		combinedAuth.GET("/tunnels/:tunnel_id/stats", tunnelHandler.GetTunnelStats)
-		combinedAuth.GET("/analytics/tunnels/:tunnel_id/stats", analyticsHandler.GetTunnelStats)
 		combinedAuth.GET("/auth/token/info", authHandler.GetTokenInfo)
 	}
 

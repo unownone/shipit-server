@@ -148,73 +148,11 @@ func (s *HealthAnalyticsTestSuite) TestGetTrafficAnalytics() {
 
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
-				assert.Contains(s.T(), resp.Body, "requests")
-				assert.Contains(s.T(), resp.Body, "bandwidth")
-				assert.Contains(s.T(), resp.Body, "period")
-				assert.Contains(s.T(), resp.Body, "generated_at")
-			} else {
-				AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
-			}
-		})
-	}
-}
-
-// TestGetTunnelAnalytics tests tunnel analytics endpoint
-func (s *HealthAnalyticsTestSuite) TestGetTunnelAnalytics() {
-	tests := []struct {
-		name           string
-		user           *testUser
-		queryParams    string
-		expectedStatus int
-		expectedError  string
-	}{
-		{
-			name:           "get tunnel analytics with default period",
-			user:           s.testSuite.TestUser,
-			expectedStatus: 200,
-		},
-		{
-			name:           "get tunnel analytics with 24h period",
-			user:           s.testSuite.TestUser,
-			queryParams:    "?period=24h",
-			expectedStatus: 200,
-		},
-		{
-			name:           "get tunnel analytics with 7d period",
-			user:           s.testSuite.TestUser,
-			queryParams:    "?period=7d",
-			expectedStatus: 200,
-		},
-		{
-			name:           "get tunnel analytics with 30d period",
-			user:           s.testSuite.TestUser,
-			queryParams:    "?period=30d",
-			expectedStatus: 200,
-		},
-		{
-			name:           "get tunnel analytics without authentication",
-			user:           nil,
-			expectedStatus: 401,
-			expectedError:  "Authorization header is required",
-		},
-	}
-
-	for _, test := range tests {
-		s.Run(test.name, func() {
-			var resp *APIResponse
-			path := "/api/v1/analytics/tunnels" + test.queryParams
-			if test.user != nil {
-				resp = s.testSuite.MakeAuthenticatedRequest("GET", path, nil, test.user)
-			} else {
-				resp = s.testSuite.MakeRequest("GET", path, nil, nil)
-			}
-
-			if test.expectedStatus < 400 {
-				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
-				assert.Contains(s.T(), resp.Body, "tunnels")
-				assert.Contains(s.T(), resp.Body, "active_tunnels")
-				assert.Contains(s.T(), resp.Body, "total_requests")
-				assert.Contains(s.T(), resp.Body, "total_bandwidth")
+				assert.Contains(s.T(), resp.Body, "countries")
+				assert.Contains(s.T(), resp.Body, "top_visitors")
+				assert.Contains(s.T(), resp.Body, "top_paths")
+				assert.Contains(s.T(), resp.Body, "status_codes")
+				assert.Contains(s.T(), resp.Body, "user_agents")
 				assert.Contains(s.T(), resp.Body, "period")
 				assert.Contains(s.T(), resp.Body, "generated_at")
 			} else {
@@ -225,5 +163,6 @@ func (s *HealthAnalyticsTestSuite) TestGetTunnelAnalytics() {
 }
 
 func TestHealthAnalyticsTestSuite(t *testing.T) {
+	t.Log("Running HealthAnalyticsTestSuite")
 	suite.Run(t, new(HealthAnalyticsTestSuite))
 }

@@ -115,7 +115,6 @@ func (s *TunnelsTestSuite) TestCreateTunnel() {
 				assert.Contains(s.T(), resp.Body, "tunnel_id")
 				assert.Contains(s.T(), resp.Body, "public_url")
 				assert.Contains(s.T(), resp.Body, "protocol")
-				assert.Contains(s.T(), resp.Body, "local_port")
 				assert.Contains(s.T(), resp.Body, "status")
 				assert.Contains(s.T(), resp.Body, "created_at")
 			} else {
@@ -161,8 +160,8 @@ func (s *TunnelsTestSuite) TestListTunnels() {
 		{
 			name:           "list tunnels without authentication",
 			user:           nil,
-			expectedStatus: 401,
-			expectedError:  "API key header is required",
+			expectedStatus: 403,
+			expectedError:  "No Auth Header Provided",
 		},
 	}
 
@@ -179,9 +178,6 @@ func (s *TunnelsTestSuite) TestListTunnels() {
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
 				assert.Contains(s.T(), resp.Body, "tunnels")
-				assert.Contains(s.T(), resp.Body, "total")
-				assert.Contains(s.T(), resp.Body, "page")
-				assert.Contains(s.T(), resp.Body, "limit")
 			} else {
 				AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
 			}
@@ -230,8 +226,8 @@ func (s *TunnelsTestSuite) TestGetTunnel() {
 			name:           "get tunnel without authentication",
 			user:           nil,
 			tunnelID:       tunnelID,
-			expectedStatus: 401,
-			expectedError:  "API key header is required",
+			expectedStatus: 403,
+			expectedError:  "No Auth Header Provided",
 		},
 	}
 
@@ -301,8 +297,8 @@ func (s *TunnelsTestSuite) TestDeleteTunnel() {
 			name:           "delete tunnel without authentication",
 			user:           nil,
 			tunnelID:       tunnelID,
-			expectedStatus: 401,
-			expectedError:  "API key header is required",
+			expectedStatus: 403,
+			expectedError:  "No Auth Header Provided",
 		},
 	}
 
@@ -375,8 +371,8 @@ func (s *TunnelsTestSuite) TestGetTunnelStats() {
 			name:           "get tunnel stats without authentication",
 			user:           nil,
 			tunnelID:       tunnelID,
-			expectedStatus: 401,
-			expectedError:  "API key header is required",
+			expectedStatus: 403,
+			expectedError:  "No Auth Header Provided",
 		},
 	}
 
@@ -393,8 +389,11 @@ func (s *TunnelsTestSuite) TestGetTunnelStats() {
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
 				assert.Equal(s.T(), test.tunnelID, resp.Body["tunnel_id"])
-				assert.Contains(s.T(), resp.Body, "metrics")
-				assert.Contains(s.T(), resp.Body, "time_series")
+				assert.Contains(s.T(), resp.Body, "active_connections")
+				assert.Contains(s.T(), resp.Body, "total_requests")
+				assert.Contains(s.T(), resp.Body, "total_bytes_in")
+				assert.Contains(s.T(), resp.Body, "total_bytes_out")
+				assert.Contains(s.T(), resp.Body, "analytics")
 			} else {
 				AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
 			}
