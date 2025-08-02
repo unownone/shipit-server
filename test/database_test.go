@@ -25,11 +25,11 @@ func (s *DatabaseTestSuite) TearDownTest() {
 // TestRunMigrations tests the RunMigrations function
 func (s *DatabaseTestSuite) TestRunMigrations() {
 	ctx := context.Background()
-	
+
 	// Test running migrations
 	err := s.testSuite.DB.RunMigrations(ctx)
 	assert.NoError(s.T(), err, "RunMigrations should succeed")
-	
+
 	// The function currently just logs and returns nil, so this should always pass
 	// In a real implementation, this would actually run the migrations
 }
@@ -37,15 +37,15 @@ func (s *DatabaseTestSuite) TestRunMigrations() {
 // TestCleanupExpiredTokens tests the CleanupExpiredTokens function
 func (s *DatabaseTestSuite) TestCleanupExpiredTokens() {
 	ctx := context.Background()
-	
+
 	// Test cleanup with no expired tokens
 	err := s.testSuite.DB.CleanupExpiredTokens(ctx)
 	assert.NoError(s.T(), err, "Cleanup should succeed even with no expired tokens")
-	
+
 	// Create some test data that would be cleaned up
 	// This is a basic test since we can't easily create expired tokens in the test environment
 	// In a real scenario, you'd create expired tokens, sessions, API keys, etc.
-	
+
 	// Test cleanup again
 	err = s.testSuite.DB.CleanupExpiredTokens(ctx)
 	assert.NoError(s.T(), err, "Cleanup should succeed on subsequent calls")
@@ -57,11 +57,12 @@ func (s *DatabaseTestSuite) TestCleanupExpiredTokensWithContext() {
 	ctx := context.Background()
 	err := s.testSuite.DB.CleanupExpiredTokens(ctx)
 	assert.NoError(s.T(), err, "Cleanup should succeed with background context")
-	
+
 	// Test with cancelled context
 	cancelledCtx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 	err = s.testSuite.DB.CleanupExpiredTokens(cancelledCtx)
+	assert.NoError(s.T(), err, "Cleanup should handle cancelled context gracefully")
 	// This might succeed or fail depending on implementation, but shouldn't panic
 	// assert.NoError(s.T(), err, "Cleanup should handle cancelled context gracefully")
 }
@@ -72,7 +73,7 @@ func (s *DatabaseTestSuite) TestRunMigrationsWithContext() {
 	ctx := context.Background()
 	err := s.testSuite.DB.RunMigrations(ctx)
 	assert.NoError(s.T(), err, "RunMigrations should succeed with background context")
-	
+
 	// Test with cancelled context
 	cancelledCtx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
@@ -83,4 +84,4 @@ func (s *DatabaseTestSuite) TestRunMigrationsWithContext() {
 
 func TestDatabaseTestSuite(t *testing.T) {
 	suite.Run(t, new(DatabaseTestSuite))
-} 
+}

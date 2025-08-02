@@ -79,7 +79,7 @@ type ChangePasswordRequest struct {
 
 // Register handles user registration
 // @Summary Register a new user
-// @Description Register a new user account
+// @Description Register a new user account with email, password, and name
 // @Tags authentication
 // @Accept json
 // @Produce json
@@ -164,6 +164,16 @@ func (h *UserHandler) Register(c *gin.Context) {
 }
 
 // Login handles user login
+// @Summary Login user
+// @Description Authenticate user with email and password
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Param request body LoginRequest true "User login credentials"
+// @Success 200 {object} map[string]interface{} "Login successful"
+// @Failure 400 {object} map[string]interface{} "Invalid request data"
+// @Failure 401 {object} map[string]interface{} "Invalid credentials or account deactivated"
+// @Router /users/login [post]
 func (h *UserHandler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -229,6 +239,15 @@ func (h *UserHandler) Login(c *gin.Context) {
 }
 
 // GetProfile handles getting user profile
+// @Summary Get user profile
+// @Description Get current user's profile information
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{} "User profile"
+// @Failure 401 {object} map[string]interface{} "User not authenticated"
+// @Router /users/profile [get]
 func (h *UserHandler) GetProfile(c *gin.Context) {
 	user, exists := middleware.GetCurrentUser(c)
 	if !exists {
@@ -252,6 +271,17 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 }
 
 // UpdateProfile handles updating user profile
+// @Summary Update user profile
+// @Description Update current user's profile information
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body UpdateProfileRequest true "Profile update data"
+// @Success 200 {object} map[string]interface{} "Profile updated successfully"
+// @Failure 400 {object} map[string]interface{} "Invalid request data"
+// @Failure 401 {object} map[string]interface{} "User not authenticated"
+// @Router /users/profile [put]
 func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	userID, exists := middleware.GetCurrentUserID(c)
 	if !exists {
@@ -337,6 +367,16 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 }
 
 // RefreshToken handles token refresh
+// @Summary Refresh access token
+// @Description Refresh access token using refresh token
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Param request body RefreshTokenRequest true "Refresh token request"
+// @Success 200 {object} map[string]interface{} "Token refreshed successfully"
+// @Failure 400 {object} map[string]interface{} "Invalid request data"
+// @Failure 401 {object} map[string]interface{} "Invalid or expired refresh token"
+// @Router /users/refresh [post]
 func (h *UserHandler) RefreshToken(c *gin.Context) {
 	var req RefreshTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -364,6 +404,17 @@ func (h *UserHandler) RefreshToken(c *gin.Context) {
 }
 
 // Logout handles user logout
+// @Summary Logout user
+// @Description Logout user by revoking refresh token
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body RefreshTokenRequest true "Refresh token to revoke"
+// @Success 200 {object} map[string]interface{} "Logged out successfully"
+// @Failure 400 {object} map[string]interface{} "Invalid request data"
+// @Failure 401 {object} map[string]interface{} "User not authenticated"
+// @Router /users/logout [post]
 func (h *UserHandler) Logout(c *gin.Context) {
 	// Get refresh token from request body or header
 	var req RefreshTokenRequest
@@ -391,6 +442,17 @@ func (h *UserHandler) Logout(c *gin.Context) {
 }
 
 // CreateAPIKey handles API key creation
+// @Summary Create API key
+// @Description Create a new API key for the authenticated user
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body CreateAPIKeyRequest true "API key creation parameters"
+// @Success 201 {object} map[string]interface{} "API key created successfully"
+// @Failure 400 {object} map[string]interface{} "Invalid request data"
+// @Failure 401 {object} map[string]interface{} "User not authenticated"
+// @Router /users/api-keys [post]
 func (h *UserHandler) CreateAPIKey(c *gin.Context) {
 	userID, exists := middleware.GetCurrentUserID(c)
 	if !exists {

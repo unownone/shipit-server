@@ -96,7 +96,17 @@ type CountryStat struct {
 }
 
 // GetOverview returns user's analytics overview - Control Plane API
-// GET /api/analytics/overview?period=24h|7d|30d
+// @Summary Get analytics overview
+// @Description Get user's analytics overview for the specified period
+// @Tags analytics
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param period query string false "Time period (24h, 7d, 30d)" default(24h)
+// @Success 200 {object} AnalyticsOverviewResponse "Analytics overview"
+// @Failure 400 {object} map[string]interface{} "Invalid period parameter"
+// @Failure 401 {object} map[string]interface{} "User not authenticated"
+// @Router /analytics/overview [get]
 func (h *AnalyticsHandler) GetOverview(c *gin.Context) {
 	log := logger.Get()
 	log.WithField("endpoint", "GetOverview").Debug("Analytics overview request")
