@@ -1,5 +1,87 @@
 basePath: /api/v1
 definitions:
+  handlers.AnalyticsOverviewResponse:
+    properties:
+      active_tunnels:
+        type: integer
+      generated_at:
+        type: string
+      period:
+        type: string
+      total_bandwidth:
+        description: Human readable (e.g., "2.3GB")
+        type: string
+      total_bandwidth_bytes:
+        type: integer
+      total_requests:
+        type: integer
+      total_tunnels:
+        type: integer
+    type: object
+  handlers.CreateAPIKeyRequest:
+    properties:
+      expires_at:
+        type: string
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  handlers.CreateTunnelRequest:
+    properties:
+      local_port:
+        description: Port on client side
+        minimum: 1
+        type: integer
+      protocol:
+        allOf:
+        - $ref: '#/definitions/handlers.TunnelProtocol'
+        description: '"http" or "tcp"'
+      subdomain:
+        description: Optional custom subdomain
+        type: string
+    required:
+    - local_port
+    - protocol
+    type: object
+  handlers.CreateTunnelResponse:
+    properties:
+      created_at:
+        description: ISO timestamp
+        type: string
+      protocol:
+        description: http or tcp
+        type: string
+      public_port:
+        description: For TCP tunnels only
+        type: integer
+      public_url:
+        description: Public URL for accessing tunnel
+        type: string
+      status:
+        description: Current status
+        type: string
+      tunnel_id:
+        description: UUID of created tunnel
+        type: string
+    type: object
+  handlers.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  handlers.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
   handlers.RegisterRequest:
     properties:
       email:
@@ -14,6 +96,74 @@ definitions:
     - email
     - name
     - password
+    type: object
+  handlers.TunnelAnalyticsPoint:
+    properties:
+      bytes_in:
+        type: integer
+      bytes_out:
+        type: integer
+      error_count:
+        type: integer
+      requests_count:
+        type: integer
+      response_time_avg:
+        type: number
+      timestamp:
+        type: string
+    type: object
+  handlers.TunnelListResponse:
+    properties:
+      created_at:
+        type: string
+      local_port:
+        type: integer
+      protocol:
+        type: string
+      public_port:
+        type: integer
+      public_url:
+        type: string
+      status:
+        type: string
+      subdomain:
+        type: string
+      tunnel_id:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  handlers.TunnelProtocol:
+    enum:
+    - http
+    - tcp
+    type: string
+    x-enum-varnames:
+    - ProtocolHTTP
+    - ProtocolTCP
+  handlers.TunnelStatsResponse:
+    properties:
+      active_connections:
+        type: integer
+      analytics:
+        items:
+          $ref: '#/definitions/handlers.TunnelAnalyticsPoint'
+        type: array
+      total_bytes_in:
+        type: integer
+      total_bytes_out:
+        type: integer
+      total_requests:
+        type: integer
+      tunnel_id:
+        type: string
+    type: object
+  handlers.UpdateProfileRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
     type: object
   handlers.ValidateTokenRequest:
     properties:
@@ -48,11 +198,75 @@ info:
   title: ShipIt Server API
   version: 1.0.0
 paths:
+  /analytics/overview:
+    get:
+      consumes:
+      - application/json
+      description: Get user's analytics overview for the specified period
+      parameters:
+      - default: 24h
+        description: Time period (24h, 7d, 30d)
+        in: query
+        name: period
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Analytics overview
+          schema:
+            $ref: '#/definitions/handlers.AnalyticsOverviewResponse'
+        "400":
+          description: Invalid period parameter
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get analytics overview
+      tags:
+      - analytics
+  /auth/token/info:
+    get:
+      consumes:
+      - application/json
+      description: Provides detailed information about the current authentication
+        token
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Token information
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Missing authorization header
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Invalid token
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Get token information
+      tags:
+      - authentication
   /auth/validate:
     post:
       consumes:
       - application/json
-      description: Validates both API keys and JWT tokens
+      description: Validates both API keys and JWT tokens. Can be called with either
+        API key or JWT token in Authorization header or request body.
       parameters:
       - description: Token validation request
         in: body
@@ -64,22 +278,405 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Token validation successful
           schema:
             $ref: '#/definitions/handlers.ValidateTokenResponse'
         "400":
-          description: Invalid request
+          description: Invalid request data
+          schema:
+            $ref: '#/definitions/handlers.ValidateTokenResponse'
+        "401":
+          description: Token is invalid
+          schema:
+            $ref: '#/definitions/handlers.ValidateTokenResponse'
+      summary: Validate authentication token
+      tags:
+      - authentication
+  /tunnels:
+    get:
+      consumes:
+      - application/json
+      description: Get a list of all tunnels for the authenticated user
+      parameters:
+      - description: Filter by tunnel status (active, inactive, terminated)
+        in: query
+        name: status
+        type: string
+      - description: 'Number of tunnels to return (default: 50, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Number of tunnels to skip (default: 0)'
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of tunnels
           schema:
             additionalProperties: true
             type: object
-      summary: Validate authentication token
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: List user tunnels
+      tags:
+      - tunnels
+    post:
+      consumes:
+      - application/json
+      description: Create a new HTTP or TCP tunnel for exposing local services
+      parameters:
+      - description: Tunnel creation parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateTunnelRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Tunnel created successfully
+          schema:
+            $ref: '#/definitions/handlers.CreateTunnelResponse'
+        "400":
+          description: Invalid request data or tunnel limit reached
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Subdomain already taken
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new tunnel
+      tags:
+      - tunnels
+  /tunnels/{tunnel_id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific tunnel
+      parameters:
+      - description: Tunnel ID
+        in: path
+        name: tunnel_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Tunnel deleted successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Tunnel not found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Delete tunnel
+      tags:
+      - tunnels
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about a specific tunnel
+      parameters:
+      - description: Tunnel ID
+        in: path
+        name: tunnel_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Tunnel details
+          schema:
+            $ref: '#/definitions/handlers.TunnelListResponse'
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Tunnel not found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Get tunnel details
+      tags:
+      - tunnels
+  /tunnels/{tunnel_id}/stats:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed statistics for a specific tunnel
+      parameters:
+      - description: Tunnel ID
+        in: path
+        name: tunnel_id
+        required: true
+        type: string
+      - default: 24h
+        description: Time period for statistics
+        in: query
+        name: period
+        type: string
+      - default: requests,bandwidth,latency
+        description: Metrics to include
+        in: query
+        name: metrics
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Tunnel statistics
+          schema:
+            $ref: '#/definitions/handlers.TunnelStatsResponse'
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Tunnel not found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Get tunnel statistics
+      tags:
+      - tunnels
+  /users/api-keys:
+    post:
+      consumes:
+      - application/json
+      description: Create a new API key for the authenticated user
+      parameters:
+      - description: API key creation parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateAPIKeyRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: API key created successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request data
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create API key
+      tags:
+      - authentication
+  /users/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user with email and password
+      parameters:
+      - description: User login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Login successful
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request data
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Invalid credentials or account deactivated
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Login user
+      tags:
+      - authentication
+  /users/logout:
+    post:
+      consumes:
+      - application/json
+      description: Logout user by revoking refresh token
+      parameters:
+      - description: Refresh token to revoke
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Logged out successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request data
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Logout user
+      tags:
+      - authentication
+  /users/profile:
+    get:
+      consumes:
+      - application/json
+      description: Get current user's profile information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User profile
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get user profile
+      tags:
+      - authentication
+    put:
+      consumes:
+      - application/json
+      description: Update current user's profile information
+      parameters:
+      - description: Profile update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Profile updated successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request data
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update user profile
+      tags:
+      - authentication
+  /users/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Refresh access token using refresh token
+      parameters:
+      - description: Refresh token request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Token refreshed successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request data
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Invalid or expired refresh token
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Refresh access token
       tags:
       - authentication
   /users/register:
     post:
       consumes:
       - application/json
-      description: Register a new user account
+      description: Register a new user account with email, password, and name
       parameters:
       - description: User registration data
         in: body
@@ -110,13 +707,22 @@ paths:
       - authentication
 securityDefinitions:
   ApiKeyAuth:
-    description: API key authentication. Use "Bearer {api_key}" format.
+    description: API key authentication for CLI agents and web users
     in: header
     name: Authorization
     type: apiKey
   BearerAuth:
-    description: JWT token authentication. Use "Bearer {jwt_token}" format.
+    description: JWT token authentication for web users
     in: header
     name: Authorization
     type: apiKey
 swagger: "2.0"
+tags:
+- description: Authentication and user management endpoints
+  name: authentication
+- description: Tunnel management endpoints
+  name: tunnels
+- description: Analytics and statistics endpoints
+  name: analytics
+- description: Administrative endpoints (admin role required)
+  name: admin

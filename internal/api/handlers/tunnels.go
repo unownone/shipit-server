@@ -109,6 +109,18 @@ func (p TunnelProtocol) IsValid() bool {
 }
 
 // CreateTunnel creates a new tunnel - Control Plane API
+// @Summary Create a new tunnel
+// @Description Create a new HTTP or TCP tunnel for exposing local services
+// @Tags tunnels
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Param request body CreateTunnelRequest true "Tunnel creation parameters"
+// @Success 201 {object} CreateTunnelResponse "Tunnel created successfully"
+// @Failure 400 {object} map[string]interface{} "Invalid request data or tunnel limit reached"
+// @Failure 401 {object} map[string]interface{} "User not authenticated"
+// @Failure 409 {object} map[string]interface{} "Subdomain already taken"
+// @Router /tunnels [post]
 func (h *TunnelHandler) CreateTunnel(c *gin.Context) {
 	userID, exists := middleware.GetCurrentUserID(c)
 	if !exists {
@@ -274,6 +286,19 @@ func (h *TunnelHandler) CreateTunnel(c *gin.Context) {
 }
 
 // ListTunnels lists user's tunnels - Control Plane API
+// @Summary List user tunnels
+// @Description Get a list of all tunnels for the authenticated user
+// @Tags tunnels
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Security BearerAuth
+// @Param status query string false "Filter by tunnel status (active, inactive, terminated)"
+// @Param limit query int false "Number of tunnels to return (default: 50, max: 100)"
+// @Param offset query int false "Number of tunnels to skip (default: 0)"
+// @Success 200 {object} map[string]interface{} "List of tunnels"
+// @Failure 401 {object} map[string]interface{} "User not authenticated"
+// @Router /tunnels [get]
 func (h *TunnelHandler) ListTunnels(c *gin.Context) {
 	userID, exists := middleware.GetCurrentUserID(c)
 	if !exists {
@@ -346,6 +371,18 @@ func (h *TunnelHandler) ListTunnels(c *gin.Context) {
 }
 
 // GetTunnel gets a specific tunnel - Control Plane API
+// @Summary Get tunnel details
+// @Description Get detailed information about a specific tunnel
+// @Tags tunnels
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Security BearerAuth
+// @Param tunnel_id path string true "Tunnel ID"
+// @Success 200 {object} TunnelListResponse "Tunnel details"
+// @Failure 401 {object} map[string]interface{} "User not authenticated"
+// @Failure 404 {object} map[string]interface{} "Tunnel not found"
+// @Router /tunnels/{tunnel_id} [get]
 func (h *TunnelHandler) GetTunnel(c *gin.Context) {
 	userID, exists := middleware.GetCurrentUserID(c)
 	if !exists {
@@ -398,6 +435,18 @@ func (h *TunnelHandler) GetTunnel(c *gin.Context) {
 }
 
 // DeleteTunnel terminates a tunnel - Control Plane API
+// @Summary Delete tunnel
+// @Description Delete a specific tunnel
+// @Tags tunnels
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Security BearerAuth
+// @Param tunnel_id path string true "Tunnel ID"
+// @Success 200 {object} map[string]interface{} "Tunnel deleted successfully"
+// @Failure 401 {object} map[string]interface{} "User not authenticated"
+// @Failure 404 {object} map[string]interface{} "Tunnel not found"
+// @Router /tunnels/{tunnel_id} [delete]
 func (h *TunnelHandler) DeleteTunnel(c *gin.Context) {
 	userID, exists := middleware.GetCurrentUserID(c)
 	if !exists {
@@ -472,6 +521,20 @@ func (h *TunnelHandler) DeleteTunnel(c *gin.Context) {
 }
 
 // GetTunnelStats gets tunnel statistics - Control Plane API
+// @Summary Get tunnel statistics
+// @Description Get detailed statistics for a specific tunnel
+// @Tags tunnels
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Security BearerAuth
+// @Param tunnel_id path string true "Tunnel ID"
+// @Param period query string false "Time period for statistics" default(24h)
+// @Param metrics query string false "Metrics to include" default(requests,bandwidth,latency)
+// @Success 200 {object} TunnelStatsResponse "Tunnel statistics"
+// @Failure 401 {object} map[string]interface{} "User not authenticated"
+// @Failure 404 {object} map[string]interface{} "Tunnel not found"
+// @Router /tunnels/{tunnel_id}/stats [get]
 func (h *TunnelHandler) GetTunnelStats(c *gin.Context) {
 	userID, exists := middleware.GetCurrentUserID(c)
 	if !exists {

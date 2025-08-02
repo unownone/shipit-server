@@ -11,6 +11,8 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  pages: write
+  id-token: write
 
 env:
   GO_VERSION: '1.24.2'
@@ -134,6 +136,139 @@ jobs:
         with:
           name: build-binaries
           path: bin/
+
+  docs:
+    name: Build and Deploy API Documentation
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install Swagger UI
+        run: |
+          npm install -g swagger-ui-dist
+
+      - name: Install Swaggo
+        run: |
+          go install github.com/swaggo/swag/cmd/swag@latest
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: |
+          go mod download
+          go mod verify
+
+      - name: Generate Swagger documentation
+        run: |
+          swag init -g cmd/server/main.go -o docs
+
+      - name: Create documentation directory
+        run: mkdir -p docs-build
+
+      - name: Generate Swagger HTML
+        run: |
+          cat > docs-build/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>ShipIt Server API Documentation</title>
+              <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css" />
+              <style>
+                  html {
+                      box-sizing: border-box;
+                      overflow: -moz-scrollbars-vertical;
+                      overflow-y: scroll;
+                  }
+                  *, *:before, *:after {
+                      box-sizing: inherit;
+                  }
+                  body {
+                      margin:0;
+                      background: #fafafa;
+                  }
+                  .swagger-ui .topbar {
+                      display: none;
+                  }
+                  .swagger-ui .info .title {
+                      color: #3b4151;
+                      font-size: 36px;
+                      font-weight: 600;
+                      margin: 0;
+                      font-family: sans-serif;
+                  }
+                  .swagger-ui .info .description {
+                      font-size: 14px;
+                      line-height: 1.5em;
+                      color: #3b4151;
+                      margin: 1em 0;
+                      font-family: sans-serif;
+                  }
+              </style>
+          </head>
+          <body>
+              <div id="swagger-ui"></div>
+              <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+              <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js"></script>
+              <script>
+                  window.onload = function() {
+                      const ui = SwaggerUIBundle({
+                          url: './swagger.json',
+                          dom_id: '#swagger-ui',
+                          deepLinking: true,
+                          presets: [
+                              SwaggerUIBundle.presets.apis,
+                              SwaggerUIStandalonePreset
+                          ],
+                          plugins: [
+                              SwaggerUIBundle.plugins.DownloadUrl
+                          ],
+                          layout: "StandaloneLayout",
+                          validatorUrl: null,
+                          onComplete: function() {
+                              console.log('Swagger UI loaded successfully');
+                          }
+                      });
+                  };
+              </script>
+          </body>
+          </html>
+          EOF
+
+      - name: Copy Swagger files
+        run: |
+          cp docs/swagger.json docs-build/
+          cp docs/swagger.yaml docs-build/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-build
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
 
   quality-gates:
     name: Quality Gates

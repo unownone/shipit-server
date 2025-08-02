@@ -36,8 +36,6 @@ func (s *AuthTestSuite) TestGetTokenInfo() {
 	assert.Equal(s.T(), 201, createResp.StatusCode)
 	apiKey := createResp.Body["api_key"].(map[string]interface{})
 	apiKeyValue := apiKey["key"].(string)
-	
-
 
 	// Login to get JWT token
 	loginResp := s.testSuite.MakeRequest("POST", "/api/v1/users/login", map[string]interface{}{
@@ -153,7 +151,7 @@ func (s *AuthTestSuite) TestGetTokenInfo() {
 func (s *AuthTestSuite) TestHasPermission() {
 	// Create auth middleware to test the function
 	authMiddleware := middleware.NewAuthMiddleware(s.testSuite.JWTManager, s.testSuite.APIKeyManager)
-	
+
 	tests := []struct {
 		name           string
 		userRole       auth.UserRole
@@ -235,13 +233,13 @@ func (s *AuthTestSuite) TestHasPermission() {
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
 			c.Set("user_role", test.userRole)
-			
+
 			// Create the middleware with the required role
 			middlewareFunc := authMiddleware.RequireRole(test.requiredRole)
-			
+
 			// Call the middleware
 			middlewareFunc(c)
-			
+
 			// Check if the request was aborted (permission denied) or not
 			if test.expectedResult {
 				assert.False(s.T(), c.IsAborted(), "Request should not have been aborted for granted permission")
@@ -256,7 +254,7 @@ func (s *AuthTestSuite) TestHasPermission() {
 func (s *AuthTestSuite) TestGetCurrentUserRole() {
 	// Create a mock gin context
 	gin.SetMode(gin.TestMode)
-	
+
 	tests := []struct {
 		name           string
 		setupContext   func(*gin.Context)
@@ -289,7 +287,7 @@ func (s *AuthTestSuite) TestGetCurrentUserRole() {
 		},
 		{
 			name: "role not in context",
-			setupContext: func(c *gin.Context) {
+			setupContext: func(_ *gin.Context) {
 				// Don't set anything
 			},
 			expectedRole:   "",
@@ -320,8 +318,3 @@ func (s *AuthTestSuite) TestGetCurrentUserRole() {
 func TestAuthTestSuite(t *testing.T) {
 	suite.Run(t, new(AuthTestSuite))
 }
-
-
-
-
-

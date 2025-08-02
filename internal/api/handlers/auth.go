@@ -37,13 +37,14 @@ type ValidateTokenResponse struct {
 
 // ValidateToken validates API keys and JWT tokens - Control Plane API
 // @Summary Validate authentication token
-// @Description Validates both API keys and JWT tokens
+// @Description Validates both API keys and JWT tokens. Can be called with either API key or JWT token in Authorization header or request body.
 // @Tags authentication
 // @Accept json
 // @Produce json
 // @Param request body ValidateTokenRequest true "Token validation request"
-// @Success 200 {object} ValidateTokenResponse
-// @Failure 400 {object} map[string]interface{} "Invalid request"
+// @Success 200 {object} ValidateTokenResponse "Token validation successful"
+// @Failure 400 {object} ValidateTokenResponse "Invalid request data"
+// @Failure 401 {object} ValidateTokenResponse "Token is invalid"
 // @Router /auth/validate [post]
 func (h *AuthHandler) ValidateToken(c *gin.Context) {
 	// Try to get token from Authorization header first
@@ -103,9 +104,20 @@ func (h *AuthHandler) ValidateToken(c *gin.Context) {
 }
 
 // GetTokenInfo provides detailed information about a token (for debugging/admin)
+// @Summary Get token information
+// @Description Provides detailed information about the current authentication token
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{} "Token information"
+// @Failure 400 {object} map[string]interface{} "Missing authorization header"
+// @Failure 401 {object} map[string]interface{} "Invalid token"
+// @Router /auth/token/info [get]
 func (h *AuthHandler) GetTokenInfo(c *gin.Context) {
 	var token string
-	
+
 	// Check Authorization header first (for JWT tokens and API keys)
 	authHeader := c.GetHeader("Authorization")
 	if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {

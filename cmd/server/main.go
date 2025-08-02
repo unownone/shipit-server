@@ -1,4 +1,4 @@
-// Package main is the main package for the ShipIt server
+// Package main provides the main entry point for the ShipIt server
 package main
 
 import (
@@ -40,12 +40,24 @@ import (
 // @securityDefinitions.apikey ApiKeyAuth
 // @in header
 // @name Authorization
-// @description API key authentication. Use "Bearer {api_key}" format.
+// @description API key authentication for CLI agents and web users
 
 // @securityDefinitions.apikey BearerAuth
 // @in header
 // @name Authorization
-// @description JWT token authentication. Use "Bearer {jwt_token}" format.
+// @description JWT token authentication for web users
+
+// @tag.name authentication
+// @tag.description Authentication and user management endpoints
+
+// @tag.name tunnels
+// @tag.description Tunnel management endpoints
+
+// @tag.name analytics
+// @tag.description Analytics and statistics endpoints
+
+// @tag.name admin
+// @tag.description Administrative endpoints (admin role required)
 
 func main() {
 	// Initialize logger first

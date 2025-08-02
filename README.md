@@ -86,6 +86,81 @@ A secure, high-performance tunneling server that creates secure tunnels to expos
    make run  # Run server locally
    ```
 
+## 📚 **API Documentation**
+
+ShipIt Server provides a comprehensive REST API with automatic documentation generation using Swaggo.
+
+### **Interactive Documentation**
+
+- **Local Development**: `http://localhost:8080/swagger/index.html`
+- **GitHub Pages**: `https://[username].github.io/[repo-name]/` (auto-deployed)
+
+### **Generating Documentation**
+
+```bash
+# Generate documentation from code comments
+make docs
+
+# Or use the script directly
+./scripts/generate-docs.sh
+```
+
+### **API Structure**
+
+The API is organized into logical groups:
+
+- **Authentication** (`/api/v1/auth/*`) - Token validation, user management
+- **Users** (`/api/v1/users/*`) - Registration, login, profile management
+- **Tunnels** (`/api/v1/tunnels/*`) - Tunnel creation and management
+- **Analytics** (`/api/v1/analytics/*`) - Usage statistics and monitoring
+- **Admin** (`/api/v1/admin/*`) - Administrative endpoints
+
+### **Authentication Methods**
+
+1. **JWT Authentication** (Web Users)
+   - Bearer token in Authorization header
+   - Used for web dashboard and user management
+
+2. **API Key Authentication** (CLI Agents)
+   - API key in Authorization header or X-API-KEY header
+   - Used for tunnel creation and management
+
+3. **Combined Authentication** (Some endpoints)
+   - Accepts both JWT and API key authentication
+   - Flexible for different client types
+
+### **Key Endpoints**
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| `POST` | `/api/v1/users/register` | Register new user | None |
+| `POST` | `/api/v1/users/login` | User login | None |
+| `POST` | `/api/v1/tunnels` | Create tunnel | API Key |
+| `GET` | `/api/v1/tunnels` | List tunnels | JWT/API Key |
+| `GET` | `/api/v1/analytics/overview` | Analytics overview | JWT |
+
+### **Response Formats**
+
+All API responses follow a consistent format:
+
+```json
+{
+  "status": "success",
+  "data": { ... },
+  "message": "Operation completed successfully"
+}
+```
+
+Error responses include detailed information:
+
+```json
+{
+  "error": "Error description",
+  "details": "Additional error context",
+  "code": "ERROR_CODE"
+}
+```
+
 ## 🔧 **Environment Configuration**
 
 ShipIt uses environment variables for all configuration. This makes it easy to deploy across different environments without changing code.
@@ -390,7 +465,7 @@ The server automatically creates and migrates the following tables:
 
 ### Project Structure
 
-```
+```shell
 shipit-server/
 ├── cmd/server/          # Main application entry point
 ├── internal/            # Private application code
@@ -458,7 +533,7 @@ make docs             # Generate API documentation
 
 ### 📖 **Test Output Example**
 
-```
+```markdown
 === RUN   TestSimpleContainerSetup
 🐳 Creating container for image postgres:15-alpine
 ✅ Container started: bc96165da423

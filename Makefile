@@ -224,9 +224,7 @@ swagger: docs ## Generate swagger documentation
 
 docs: ## Generate API documentation
 	@echo "Generating Swagger documentation..."
-	go run github.com/swaggo/swag/cmd/swag init -g cmd/server/main.go -o docs
-	@echo "Swagger docs generated at docs/"
-	@echo "View at: http://localhost:8080/swagger/index.html (when server is running)"
+	@./scripts/generate-docs.sh
 
 # Git hooks
 install-hooks: ## Install git hooks
