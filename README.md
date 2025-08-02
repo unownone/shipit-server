@@ -2,36 +2,42 @@
 
 [![CI/CD Pipeline](https://github.com/unownone/shipit-server/workflows/CI/CD%20Pipeline/badge.svg)](https://github.com/unownone/shipit-server/actions)
 [![Coverage](https://codecov.io/gh/unownone/shipit-server/branch/main/graph/badge.svg)](https://codecov.io/gh/unownone/shipit-server)
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/unownone/shipit-server?utm_source=oss&utm_medium=github&utm_campaign=unownone%2Fshipit-server&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
 A secure, high-performance tunneling server that creates secure tunnels to expose local services to the internet. Supports both HTTP and TCP tunneling with comprehensive authentication, analytics, and management capabilities.
 
 ## Features
 
 🔐 **Secure Authentication**
+
 - JWT-based authentication for web users
 - API key authentication for CLI agents
 - Role-based access control (User, Moderator, Admin)
 - Secure password hashing with bcrypt
 
 🌐 **Tunneling Capabilities**
+
 - HTTP tunnels with subdomain routing
 - TCP tunnels with dynamic port allocation
 - Connection pooling for high performance
 - Real-time tunnel status monitoring
 
 📊 **Analytics & Monitoring**
+
 - Detailed tunnel usage statistics
 - Request/response analytics
 - Connection monitoring
 - User activity tracking
 
 📝 **Structured Logging**
+
 - JSON-formatted logs for easy parsing
 - Configurable log levels (debug, info, warn, error)
 - Contextual logging with relevant fields
 - Error tracking with full context
 
 🛡️ **Security Features**
+
 - API keys are never stored in plaintext (SHA-256 hashed)
 - Secure token generation and validation
 - CORS protection
@@ -49,17 +55,20 @@ A secure, high-performance tunneling server that creates secure tunnels to expos
 ### Development Setup
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd shipit-server
    ```
 
 2. **Initialize environment variables**
+
    ```bash
    make env-init  # Creates .env from .env.example
    ```
 
 3. **Start services with Docker**
+
    ```bash
    # Option 1: Start everything in Docker
    make docker-up-all
@@ -71,6 +80,7 @@ A secure, high-performance tunneling server that creates secure tunnels to expos
    ```
 
 4. **Or use the quick setup**
+
    ```bash
    make dev  # Sets up .env, databases and dependencies
    make run  # Run server locally
@@ -116,6 +126,7 @@ SHIPIT_REDIS_HOST=redis
 ```
 
 The server will start on `http://localhost:8080` with the following services:
+
 - API endpoints: `http://localhost:8080/api/v1`
 - Health check: `http://localhost:8080/health`
 
@@ -156,6 +167,7 @@ DOMAIN=yourdomain.com docker-compose -f docker-compose.prod.yml up -d
 #### Docker Deployment (Recommended)
 
 1. **Set up environment**
+
    ```bash
    # Copy production template
    cp .env.production.example .env
@@ -168,6 +180,7 @@ DOMAIN=yourdomain.com docker-compose -f docker-compose.prod.yml up -d
    ```
 
 2. **Validate and deploy**
+
    ```bash
    make env-validate                    # Check configuration
    make docker-prod-deploy              # Deploy with docker-compose
@@ -176,11 +189,13 @@ DOMAIN=yourdomain.com docker-compose -f docker-compose.prod.yml up -d
 #### Binary Deployment
 
 1. **Build the binary**
+
    ```bash
    make build-linux
    ```
 
 2. **Set up environment**
+
    ```bash
    # Create .env file
    cp .env.production.example .env
@@ -194,6 +209,7 @@ DOMAIN=yourdomain.com docker-compose -f docker-compose.prod.yml up -d
    ```
 
 3. **Run the server**
+
    ```bash
    ./bin/shipit-server-linux
    ```
@@ -203,6 +219,7 @@ DOMAIN=yourdomain.com docker-compose -f docker-compose.prod.yml up -d
 ### Authentication
 
 #### Register a User
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/users/register \
   -H "Content-Type: application/json" \
@@ -214,6 +231,7 @@ curl -X POST http://localhost:8080/api/v1/users/register \
 ```
 
 #### Login
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/users/login \
   -H "Content-Type: application/json" \
@@ -224,6 +242,7 @@ curl -X POST http://localhost:8080/api/v1/users/login \
 ```
 
 #### Create API Key
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/users/api-keys \
   -H "Content-Type: application/json" \
@@ -236,6 +255,7 @@ curl -X POST http://localhost:8080/api/v1/users/api-keys \
 ### Tunnel Management
 
 #### Create HTTP Tunnel
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/tunnels \
   -H "Content-Type: application/json" \
@@ -249,6 +269,7 @@ curl -X POST http://localhost:8080/api/v1/tunnels \
 ```
 
 #### Create TCP Tunnel
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/tunnels \
   -H "Content-Type: application/json" \
@@ -261,12 +282,14 @@ curl -X POST http://localhost:8080/api/v1/tunnels \
 ```
 
 #### List Tunnels
+
 ```bash
 curl -X GET http://localhost:8080/api/v1/tunnels \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 #### Get Tunnel Statistics
+
 ```bash
 curl -X GET http://localhost:8080/api/v1/tunnels/{tunnelId}/stats \
   -H "Authorization: Bearer YOUR_API_KEY"
@@ -331,17 +354,20 @@ The server automatically creates and migrates the following tables:
 ## Security
 
 ### API Key Security
+
 - API keys are **never stored in plaintext**
 - Keys are hashed using SHA-256 before storage
 - Only the first 8 characters + "..." are shown in the UI
 - Keys are generated using cryptographically secure random numbers
 
 ### Password Security
+
 - Passwords are hashed using bcrypt with configurable cost
 - Minimum password requirements enforced
 - Failed login attempts are tracked and logged
 
 ### Authentication Flow
+
 1. **Web Users**: JWT-based authentication with refresh tokens
 2. **CLI Agents**: Long-lived API keys for programmatic access
 3. **Role-based Access**: Different permission levels (User, Moderator, Admin)
@@ -349,11 +375,13 @@ The server automatically creates and migrates the following tables:
 ## Performance
 
 ### Connection Pooling
+
 - Database connection pooling with configurable limits
 - Redis connection pooling for session storage
 - HTTP connection keep-alive for better performance
 
 ### Monitoring
+
 - Built-in health check endpoint
 - Database connection monitoring
 - Automated cleanup of expired tokens and sessions
@@ -361,6 +389,7 @@ The server automatically creates and migrates the following tables:
 ## Development
 
 ### Project Structure
+
 ```
 shipit-server/
 ├── cmd/server/          # Main application entry point
@@ -375,11 +404,13 @@ shipit-server/
 ```
 
 ### Running Tests
+
 ```bash
 go test ./...
 ```
 
 ### Building for Production
+
 ```bash
 # Build for current platform
 go build -o shipit-server cmd/server/main.go
@@ -393,6 +424,7 @@ GOOS=linux GOARCH=amd64 go build -o shipit-server-linux cmd/server/main.go
 ShipIt Server features a comprehensive test suite powered by **testcontainers** for seamless testing:
 
 ### ✅ **Zero-Setup Testing**
+
 ```bash
 # Just run tests - no manual database setup required!
 make test
@@ -402,12 +434,14 @@ go test -v ./test/ -run TestSimpleContainerSetup
 ```
 
 ### 🚀 **Testcontainers Integration**
+
 - **Automatic PostgreSQL containers** for each test run  
 - **Perfect isolation** - each test gets a fresh database
 - **No configuration needed** - works everywhere Docker works
 - **CI/CD ready** - runs consistently across all environments
 
 ### 📊 **Current Status**
+
 - ✅ **Testcontainers Setup**: Verified working with PostgreSQL
 - ✅ **Database Connectivity**: Automatic container management
 - ✅ **Schema Creation**: Dynamic table creation in tests
@@ -415,6 +449,7 @@ go test -v ./test/ -run TestSimpleContainerSetup
 - 🔧 **Full API Tests**: In development (JWT/UUID handling being refined)
 
 ### 🛠 **Available Commands**
+
 ```bash
 make test-status       # Check Docker status
 go test ./test/        # Run all available tests
@@ -422,6 +457,7 @@ make docs             # Generate API documentation
 ```
 
 ### 📖 **Test Output Example**
+
 ```
 === RUN   TestSimpleContainerSetup
 🐳 Creating container for image postgres:15-alpine
@@ -436,10 +472,12 @@ make docs             # Generate API documentation
 ```
 
 ### 📖 **Documentation**
+
 - [Complete Testing Guide](docs/TESTING.md) - Detailed testing documentation  
 - [API Documentation](http://localhost:8080/swagger/index.html) - Interactive Swagger UI
 
 **Benefits:**
+
 - 🎯 **No manual setup** - testcontainers handles everything
 - 🔒 **Perfect isolation** - no test data contamination  
 - 🚀 **Fast feedback** - optimized for developer workflow
@@ -452,6 +490,7 @@ make docs             # Generate API documentation
 ### Common Issues
 
 1. **Database Connection Failed**
+
    ```bash
    # Check if PostgreSQL is running
    docker-compose ps
@@ -471,7 +510,9 @@ make docs             # Generate API documentation
    - Verify correct Authorization header format
 
 ### Debug Mode
+
 Set log level to debug for more verbose output:
+
 ```yaml
 logging:
   level: "debug"
@@ -492,6 +533,7 @@ logging:
 ## Support
 
 For issues and questions:
+
 - Check the troubleshooting section above
 - Review the API documentation
-- Open an issue on GitHub 
+- Open an issue on GitHub

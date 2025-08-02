@@ -6,6 +6,11 @@ on:
   push:
     branches: [ main, master ]
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 env:
   GO_VERSION: '1.24.2'
   COVERAGE_THRESHOLD: 50
@@ -116,8 +121,8 @@ jobs:
 
     - name: Build application
       run: |
-        go build -o bin/shipit-server cmd/server/main.go
-        go build -o bin/shipit-server-linux GOOS=linux GOARCH=amd64 cmd/server/main.go
+        make build
+        make build-linux
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
