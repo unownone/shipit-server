@@ -7,12 +7,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/unwonone/shipit-server/internal/api/middleware"
-	"github.com/unwonone/shipit-server/internal/auth"
-	"github.com/unwonone/shipit-server/internal/config"
-	"github.com/unwonone/shipit-server/internal/database"
-	"github.com/unwonone/shipit-server/internal/database/sqlc"
+	"github.com/unownone/shipit-server/internal/api/middleware"
+	"github.com/unownone/shipit-server/internal/auth"
+	"github.com/unownone/shipit-server/internal/config"
+	"github.com/unownone/shipit-server/internal/database"
+	"github.com/unownone/shipit-server/internal/database/sqlc"
+	"github.com/unownone/shipit-server/internal/logger"
 )
 
 // UserHandler handles user-related API endpoints
@@ -69,6 +69,12 @@ type CreateAPIKeyRequest struct {
 // RefreshTokenRequest represents a token refresh request
 type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+// ChangePasswordRequest represents a password change request
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required,min=8"`
 }
 
 // Register handles user registration
@@ -143,17 +149,13 @@ func (h *UserHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// Extract UUID from pgtype.UUID for response
-	var userID uuid.UUID
-	userID.Scan(user.ID.Bytes)
-
 	c.JSON(http.StatusCreated, gin.H{
 		"message":       "User registered successfully",
-		"user_id":       userID,
+		"user_id":       user.ID,
 		"access_token":  accessToken,
 		"refresh_token": refreshToken,
 		"user": gin.H{
-			"id":    userID,
+			"id":    user.ID,
 			"email": user.Email,
 			"name":  user.Name,
 			"role":  user.Role,
@@ -208,19 +210,17 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// Extract UUID from pgtype.UUID for response
-	var userID uuid.UUID
-	userID.Scan(user.ID.Bytes)
-
 	// Update last login
-	h.db.Queries.UpdateUserLastLogin(ctx, user.ID)
+	if err := h.db.Queries.UpdateUserLastLogin(ctx, user.ID); err != nil {
+		logger.WithError(err).WithField("user_id", user.ID).Error("Failed to update user last login")
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":       "Login successful",
 		"access_token":  accessToken,
 		"refresh_token": refreshToken,
 		"user": gin.H{
-			"id":    userID,
+			"id":    user.ID,
 			"email": user.Email,
 			"name":  user.Name,
 			"role":  user.Role,
@@ -238,13 +238,9 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 		return
 	}
 
-	// Extract UUID from pgtype.UUID for response
-	var userID uuid.UUID
-	userID.Scan(user.ID.Bytes)
-
 	c.JSON(http.StatusOK, gin.H{
 		"user": gin.H{
-			"id":             userID,
+			"id":             user.ID,
 			"email":          user.Email,
 			"name":           user.Name,
 			"role":           user.Role,
@@ -276,12 +272,8 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	// Convert UUID to pgtype.UUID
-	var pgUserID pgtype.UUID
-	pgUserID.Scan(userID.String())
-
 	// Get current user
-	user, err := h.db.Queries.GetUserByID(ctx, pgUserID)
+	user, err := h.db.Queries.GetUserByID(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "User not found",
@@ -291,9 +283,11 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 
 	// Update user fields
 	updateParams := sqlc.UpdateUserParams{
-		ID:   user.ID,
-		Name: user.Name,
-		Email: user.Email,
+		ID:            user.ID,
+		Name:          user.Name,
+		Email:         user.Email,
+		Role:          user.Role,
+		EmailVerified: user.EmailVerified,
 	}
 
 	if req.Name != nil {
@@ -301,10 +295,18 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	}
 
 	if req.Email != nil {
+		// Validate email format
+		if !strings.Contains(*req.Email, "@") || len(*req.Email) < 5 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Invalid email format",
+			})
+			return
+		}
+
 		// Check if email is already taken by another user
 		if strings.ToLower(*req.Email) != user.Email {
-			_, err := h.db.Queries.GetUserByEmail(ctx, strings.ToLower(*req.Email))
-			if err == nil {
+			existingUser, err := h.db.Queries.GetUserByEmail(ctx, strings.ToLower(*req.Email))
+			if err == nil && existingUser.ID != user.ID {
 				c.JSON(http.StatusConflict, gin.H{
 					"error": "Email is already taken",
 				})
@@ -418,14 +420,10 @@ func (h *UserHandler) CreateAPIKey(c *gin.Context) {
 		return
 	}
 
-	// Extract UUID from pgtype.UUID for response
-	var keyID uuid.UUID
-	keyID.Scan(apiKey.ID.Bytes)
-
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "API key created successfully",
 		"api_key": gin.H{
-			"id":         keyID,
+			"id":         apiKey.ID,
 			"name":       apiKey.Name,
 			"prefix":     apiKey.Prefix,
 			"key":        key, // Only returned once
@@ -459,11 +457,8 @@ func (h *UserHandler) ListAPIKeys(c *gin.Context) {
 	// Convert to response format
 	keys := make([]gin.H, len(apiKeys))
 	for i, key := range apiKeys {
-		var keyID uuid.UUID
-		keyID.Scan(key.ID.Bytes)
-
 		keys[i] = gin.H{
-			"id":           keyID,
+			"id":           key.ID,
 			"name":         key.Name,
 			"prefix":       key.Prefix,
 			"last_used_at": key.LastUsedAt.Time,
@@ -498,6 +493,15 @@ func (h *UserHandler) RevokeAPIKey(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
+	// Check if the API key exists and belongs to the user
+	_, err = h.apiKeyManager.GetAPIKey(ctx, keyID, userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "API key not found",
+		})
+		return
+	}
+
 	// Revoke API key
 	err = h.apiKeyManager.RevokeAPIKey(ctx, keyID, userID)
 	if err != nil {
@@ -510,4 +514,76 @@ func (h *UserHandler) RevokeAPIKey(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "API key revoked successfully",
 	})
-} 
+}
+
+// ChangePassword handles password change
+func (h *UserHandler) ChangePassword(c *gin.Context) {
+	userID, exists := middleware.GetCurrentUserID(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "User not authenticated",
+		})
+		return
+	}
+
+	var req ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request data",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	// Get current user
+	user, err := h.db.Queries.GetUserByID(ctx, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to get user information",
+		})
+		return
+	}
+
+	// Verify current password
+	if err := h.passwordManager.VerifyPassword(req.CurrentPassword, user.PasswordHash); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "Current password is incorrect",
+		})
+		return
+	}
+
+	// Validate new password
+	if err := h.passwordManager.IsPasswordValid(req.NewPassword); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	// Hash new password
+	hashedPassword, err := h.passwordManager.HashPassword(req.NewPassword)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to hash password",
+		})
+		return
+	}
+
+	// Update password in database
+	err = h.db.Queries.UpdateUserPassword(ctx, sqlc.UpdateUserPasswordParams{
+		ID:           userID,
+		PasswordHash: hashedPassword,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to update password",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Password changed successfully",
+	})
+}

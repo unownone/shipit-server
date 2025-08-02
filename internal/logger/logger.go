@@ -1,3 +1,4 @@
+// Package logger provides the logger for the application
 package logger
 
 import (
@@ -11,19 +12,19 @@ var log *logrus.Logger
 // Init initializes the global logger with configuration from environment
 func Init() {
 	log = logrus.New()
-	
+
 	// Set log level from environment
 	level := getLogLevel()
 	log.SetLevel(level)
-	
+
 	// Set formatter
 	log.SetFormatter(&logrus.JSONFormatter{
 		TimestampFormat: "2006-01-02T15:04:05.000Z07:00",
 	})
-	
+
 	// Set output to stdout
 	log.SetOutput(os.Stdout)
-	
+
 	// Log the initialization
 	log.WithField("level", level.String()).Info("Logger initialized")
 }
@@ -34,13 +35,13 @@ func getLogLevel() logrus.Level {
 	if levelStr == "" {
 		levelStr = "info"
 	}
-	
+
 	level, err := logrus.ParseLevel(levelStr)
 	if err != nil {
 		// Default to INFO if invalid level
 		return logrus.InfoLevel
 	}
-	
+
 	return level
 }
 
@@ -87,4 +88,4 @@ func WithFields(fields logrus.Fields) *logrus.Entry {
 // WithError creates a logger with an error field
 func WithError(err error) *logrus.Entry {
 	return Get().WithError(err)
-} 
+}

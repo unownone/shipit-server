@@ -1,12 +1,13 @@
+// Package api provides the API routes for the application
 package api
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/unwonone/shipit-server/internal/api/handlers"
-	"github.com/unwonone/shipit-server/internal/api/middleware"
-	"github.com/unwonone/shipit-server/internal/auth"
-	"github.com/unwonone/shipit-server/internal/config"
-	"github.com/unwonone/shipit-server/internal/database"
+	"github.com/unownone/shipit-server/internal/api/handlers"
+	"github.com/unownone/shipit-server/internal/api/middleware"
+	"github.com/unownone/shipit-server/internal/auth"
+	"github.com/unownone/shipit-server/internal/config"
+	"github.com/unownone/shipit-server/internal/database"
 )
 
 // SetupRoutes configures all API routes
@@ -65,6 +66,7 @@ func SetupRoutes(
 		// User profile management
 		jwtProtected.GET("/users/profile", userHandler.GetProfile)
 		jwtProtected.PUT("/users/profile", userHandler.UpdateProfile)
+		jwtProtected.PUT("/users/password", userHandler.ChangePassword)
 		jwtProtected.POST("/users/logout", userHandler.Logout)
 
 		// API key management
@@ -75,30 +77,33 @@ func SetupRoutes(
 		// Analytics endpoints (JWT auth for web dashboard)
 		jwtProtected.GET("/analytics/overview", analyticsHandler.GetOverview)
 		jwtProtected.GET("/analytics/traffic", analyticsHandler.GetTrafficAnalytics)
+		jwtProtected.GET("/analytics/tunnels/:tunnel_id/stats", analyticsHandler.GetTunnelStats)
 	}
 
 	// API key protected endpoints (for CLI agents and web users)
 	apiProtected := v1.Group("/")
 	apiProtected.Use(authMiddleware.APIKeyAuth())
 	{
-		// Tunnel management (Control Plane API)
+		// Tunnel Creation
 		apiProtected.POST("/tunnels", tunnelHandler.CreateTunnel)
-		apiProtected.GET("/tunnels", tunnelHandler.ListTunnels)
-		apiProtected.GET("/tunnels/:tunnelId", tunnelHandler.GetTunnel)
-		apiProtected.DELETE("/tunnels/:tunnelId", tunnelHandler.DeleteTunnel)
-		apiProtected.GET("/tunnels/:tunnelId/stats", tunnelHandler.GetTunnelStats)
-
-		// Analytics for specific tunnels (also available via API key)
-		apiProtected.GET("/analytics/tunnels/:tunnel_id/stats", analyticsHandler.GetTunnelStats)
 	}
 
-	// Mixed auth endpoints (both JWT and API key accepted)
-	mixed := v1.Group("/")
-	mixed.Use(authMiddleware.OptionalAuth())
+	optionalAuth := v1.Group("/")
+	optionalAuth.Use(authMiddleware.OptionalAuth())
 	{
-		// Authentication validation endpoint
-		mixed.POST("/auth/validate", authHandler.ValidateToken)
-		mixed.GET("/auth/info", authHandler.GetTokenInfo)
+		optionalAuth.POST("/auth/validate", authHandler.ValidateToken)
+	}
+
+	// both jwt and api key supported auth
+	combinedAuth := v1.Group("/")
+	combinedAuth.Use(authMiddleware.CombinedAuth())
+	{
+		// Tunnel management (Control Plane API)
+		combinedAuth.GET("/tunnels", tunnelHandler.ListTunnels)
+		combinedAuth.GET("/tunnels/:tunnel_id", tunnelHandler.GetTunnel)
+		combinedAuth.DELETE("/tunnels/:tunnel_id", tunnelHandler.DeleteTunnel)
+		combinedAuth.GET("/tunnels/:tunnel_id/stats", tunnelHandler.GetTunnelStats)
+		combinedAuth.GET("/auth/token/info", authHandler.GetTokenInfo)
 	}
 
 	// Admin endpoints (admin role required)
@@ -124,4 +129,4 @@ func SetupRoutes(
 			c.JSON(200, gin.H{"message": "System statistics endpoint"})
 		})
 	}
-} 
+}

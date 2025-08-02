@@ -8,6 +8,7 @@ package sqlc
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -39,7 +40,7 @@ const countActiveTunnelsByUser = `-- name: CountActiveTunnelsByUser :one
 SELECT COUNT(*) FROM tunnels WHERE user_id = $1 AND status = 'active'
 `
 
-func (q *Queries) CountActiveTunnelsByUser(ctx context.Context, userID pgtype.UUID) (int64, error) {
+func (q *Queries) CountActiveTunnelsByUser(ctx context.Context, userID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countActiveTunnelsByUser, userID)
 	var count int64
 	err := row.Scan(&count)
@@ -50,7 +51,7 @@ const countTunnelsByUser = `-- name: CountTunnelsByUser :one
 SELECT COUNT(*) FROM tunnels WHERE user_id = $1
 `
 
-func (q *Queries) CountTunnelsByUser(ctx context.Context, userID pgtype.UUID) (int64, error) {
+func (q *Queries) CountTunnelsByUser(ctx context.Context, userID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countTunnelsByUser, userID)
 	var count int64
 	err := row.Scan(&count)
@@ -67,14 +68,14 @@ INSERT INTO tunnels (
 `
 
 type CreateTunnelParams struct {
-	UserID         pgtype.UUID        `db:"user_id" json:"user_id"`
+	UserID         uuid.UUID          `db:"user_id" json:"user_id"`
 	Name           string             `db:"name" json:"name"`
 	Protocol       string             `db:"protocol" json:"protocol"`
 	Subdomain      pgtype.Text        `db:"subdomain" json:"subdomain"`
 	CustomDomain   pgtype.Text        `db:"custom_domain" json:"custom_domain"`
 	TargetHost     string             `db:"target_host" json:"target_host"`
 	TargetPort     int32              `db:"target_port" json:"target_port"`
-	PublicPort     pgtype.Int4        `db:"public_port" json:"public_port"`
+	PublicPort     *int32             `db:"public_port" json:"public_port,omitempty"`
 	Status         string             `db:"status" json:"status"`
 	AuthToken      pgtype.Text        `db:"auth_token" json:"auth_token"`
 	MaxConnections pgtype.Int4        `db:"max_connections" json:"max_connections"`
@@ -134,8 +135,8 @@ DELETE FROM tunnels WHERE id = $1 AND user_id = $2
 `
 
 type DeleteTunnelParams struct {
-	ID     pgtype.UUID `db:"id" json:"id"`
-	UserID pgtype.UUID `db:"user_id" json:"user_id"`
+	ID     uuid.UUID `db:"id" json:"id"`
+	UserID uuid.UUID `db:"user_id" json:"user_id"`
 }
 
 func (q *Queries) DeleteTunnel(ctx context.Context, arg DeleteTunnelParams) error {
@@ -168,7 +169,7 @@ const getTunnelByID = `-- name: GetTunnelByID :one
 SELECT id, user_id, name, protocol, subdomain, custom_domain, target_host, target_port, public_port, status, auth_token, max_connections, expires_at, metadata, created_at, updated_at FROM tunnels WHERE id = $1
 `
 
-func (q *Queries) GetTunnelByID(ctx context.Context, id pgtype.UUID) (Tunnels, error) {
+func (q *Queries) GetTunnelByID(ctx context.Context, id uuid.UUID) (Tunnels, error) {
 	row := q.db.QueryRow(ctx, getTunnelByID, id)
 	var i Tunnels
 	err := row.Scan(
@@ -340,9 +341,9 @@ LIMIT $2 OFFSET $3
 `
 
 type ListTunnelsByUserParams struct {
-	UserID pgtype.UUID `db:"user_id" json:"user_id"`
-	Limit  int32       `db:"limit" json:"limit"`
-	Offset int32       `db:"offset" json:"offset"`
+	UserID uuid.UUID `db:"user_id" json:"user_id"`
+	Limit  int32     `db:"limit" json:"limit"`
+	Offset int32     `db:"offset" json:"offset"`
 }
 
 func (q *Queries) ListTunnelsByUser(ctx context.Context, arg ListTunnelsByUserParams) ([]Tunnels, error) {
@@ -391,14 +392,14 @@ RETURNING id, user_id, name, protocol, subdomain, custom_domain, target_host, ta
 `
 
 type UpdateTunnelParams struct {
-	ID             pgtype.UUID        `db:"id" json:"id"`
+	ID             uuid.UUID          `db:"id" json:"id"`
 	Name           string             `db:"name" json:"name"`
 	TargetHost     string             `db:"target_host" json:"target_host"`
 	TargetPort     int32              `db:"target_port" json:"target_port"`
 	MaxConnections pgtype.Int4        `db:"max_connections" json:"max_connections"`
 	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 	Metadata       []byte             `db:"metadata" json:"metadata"`
-	UserID         pgtype.UUID        `db:"user_id" json:"user_id"`
+	UserID         uuid.UUID          `db:"user_id" json:"user_id"`
 }
 
 func (q *Queries) UpdateTunnel(ctx context.Context, arg UpdateTunnelParams) (Tunnels, error) {
@@ -441,8 +442,8 @@ WHERE id = $1
 `
 
 type UpdateTunnelStatusParams struct {
-	ID     pgtype.UUID `db:"id" json:"id"`
-	Status string      `db:"status" json:"status"`
+	ID     uuid.UUID `db:"id" json:"id"`
+	Status string    `db:"status" json:"status"`
 }
 
 func (q *Queries) UpdateTunnelStatus(ctx context.Context, arg UpdateTunnelStatusParams) error {

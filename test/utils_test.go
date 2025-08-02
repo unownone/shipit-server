@@ -15,39 +15,38 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
-	"github.com/unwonone/shipit-server/internal/api"
-	"github.com/unwonone/shipit-server/internal/auth"
-	"github.com/unwonone/shipit-server/internal/config"
-	"github.com/unwonone/shipit-server/internal/database"
-	"github.com/unwonone/shipit-server/internal/database/sqlc"
-	"github.com/unwonone/shipit-server/internal/logger"
+	"github.com/unownone/shipit-server/internal/api"
+	"github.com/unownone/shipit-server/internal/auth"
+	"github.com/unownone/shipit-server/internal/config"
+	"github.com/unownone/shipit-server/internal/database"
+	"github.com/unownone/shipit-server/internal/database/sqlc"
+	"github.com/unownone/shipit-server/internal/logger"
 )
 
-// TestSuite provides shared test infrastructure with testcontainers
-type TestSuite struct {
+// testSuite provides shared test infrastructure with testcontainers
+type testSuite struct {
 	DB              *database.Database
 	Config          *config.Config
 	Router          *gin.Engine
 	PasswordManager *auth.PasswordManager
 	JWTManager      *auth.JWTManager
 	APIKeyManager   *auth.APIKeyManager
-	
+
 	// Testcontainers
 	PostgresContainer *testcontainers.DockerContainer
-	
+
 	// Test users for authentication
-	TestUser     *TestUser
-	TestUser2    *TestUser
-	AdminUser    *TestUser
+	TestUser  *testUser
+	TestUser2 *testUser
+	AdminUser *testUser
 }
 
-// TestUser represents a test user with credentials
-type TestUser struct {
+// testUser represents a test user with credentials
+type testUser struct {
 	ID           uuid.UUID
 	Email        string
 	Password     string
@@ -65,20 +64,20 @@ type APIResponse struct {
 	Headers    http.Header
 }
 
-// SetupTestSuite initializes test infrastructure with testcontainers
-func SetupTestSuite(t *testing.T) *TestSuite {
+// setupTestSuite initializes test infrastructure with testcontainers
+func setupTestSuite(t *testing.T) *testSuite {
 	// Set Gin to test mode
 	gin.SetMode(gin.TestMode)
 
 	ctx := context.Background()
-	
+
 	// Start PostgreSQL container
 	postgresContainer, err := testcontainers.Run(ctx,
 		"postgres:15-alpine",
 		testcontainers.WithEnv(map[string]string{
-			"POSTGRES_USER": "shipit_test",
+			"POSTGRES_USER":     "shipit_test",
 			"POSTGRES_PASSWORD": "test_password",
-			"POSTGRES_DB": "shipit_test",
+			"POSTGRES_DB":       "shipit_test",
 		}),
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
@@ -90,7 +89,7 @@ func SetupTestSuite(t *testing.T) *TestSuite {
 	// Get database connection details
 	host, err := postgresContainer.Host(ctx)
 	require.NoError(t, err)
-	
+
 	port, err := postgresContainer.MappedPort(ctx, "5432")
 	require.NoError(t, err)
 
@@ -105,9 +104,9 @@ func SetupTestSuite(t *testing.T) *TestSuite {
 			SSLMode:  "disable",
 		},
 		JWT: config.JWTConfig{
-			SecretKey:            "test-jwt-secret-that-is-long-enough-for-testing",
-			AccessTokenExpiry:    15 * time.Minute,
-			RefreshTokenExpiry:   24 * time.Hour,
+			SecretKey:          "test-jwt-secret-that-is-long-enough-for-testing",
+			AccessTokenExpiry:  15 * time.Minute,
+			RefreshTokenExpiry: 24 * time.Hour,
 		},
 		Auth: config.AuthConfig{
 			HashCost: 4, // Lower cost for faster tests
@@ -121,6 +120,13 @@ func SetupTestSuite(t *testing.T) *TestSuite {
 			AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 			AllowedHeaders: []string{"*"},
 		},
+		Tunnels: config.TunnelsConfig{
+			MaxPerUser:         10,
+			ConnectionPoolSize: 10,
+			SubdomainLength:    10, // 2 characters
+			DefaultTTL:         10 * time.Minute,
+			DomainHost:         "localhost", // TODO: change domain to accept any host
+		},
 	}
 
 	// Wait a bit for PostgreSQL to be fully ready
@@ -128,7 +134,9 @@ func SetupTestSuite(t *testing.T) *TestSuite {
 
 	// Set test log level if not already set
 	if os.Getenv("LOG_LEVEL") == "" {
-		os.Setenv("LOG_LEVEL", "info")
+		if err := os.Setenv("LOG_LEVEL", "info"); err != nil {
+			t.Logf("Failed to set LOG_LEVEL environment variable: %v", err)
+		}
 	}
 
 	// Initialize logger for tests
@@ -141,7 +149,7 @@ func SetupTestSuite(t *testing.T) *TestSuite {
 	// Test database connection
 	testCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	err = db.Health(testCtx)
 	require.NoError(t, err, "Database health check failed")
 
@@ -162,7 +170,7 @@ func SetupTestSuite(t *testing.T) *TestSuite {
 	// Setup routes
 	api.SetupRoutes(router, db, cfg, passwordManager, jwtManager, apiKeyManager)
 
-	suite := &TestSuite{
+	suite := &testSuite{
 		DB:                db,
 		Config:            cfg,
 		Router:            router,
@@ -179,7 +187,7 @@ func SetupTestSuite(t *testing.T) *TestSuite {
 }
 
 // TearDownTestSuite cleans up test infrastructure
-func (s *TestSuite) TearDownTestSuite(t *testing.T) {
+func (s *testSuite) TearDownTestSuite(t *testing.T) {
 	ctx := context.Background()
 
 	if s == nil || s.DB == nil {
@@ -188,13 +196,19 @@ func (s *TestSuite) TearDownTestSuite(t *testing.T) {
 
 	// Clean up test data
 	if s.TestUser != nil {
-		s.DB.Queries.DeactivateUser(ctx, uuidToPgUUID(s.TestUser.ID))
+		if err := s.DB.Queries.DeactivateUser(ctx, s.TestUser.ID); err != nil {
+			t.Logf("Failed to deactivate test user: %v", err)
+		}
 	}
 	if s.TestUser2 != nil {
-		s.DB.Queries.DeactivateUser(ctx, uuidToPgUUID(s.TestUser2.ID))
+		if err := s.DB.Queries.DeactivateUser(ctx, s.TestUser2.ID); err != nil {
+			t.Logf("Failed to deactivate test user 2: %v", err)
+		}
 	}
 	if s.AdminUser != nil {
-		s.DB.Queries.DeactivateUser(ctx, uuidToPgUUID(s.AdminUser.ID))
+		if err := s.DB.Queries.DeactivateUser(ctx, s.AdminUser.ID); err != nil {
+			t.Logf("Failed to deactivate admin user: %v", err)
+		}
 	}
 
 	// Close database connection
@@ -268,7 +282,7 @@ func applyMigrationFiles(ctx context.Context, db *database.Database, migrationsD
 		}
 
 		fmt.Printf("Applying migration: %s\n", filepath.Base(file))
-		
+
 		content, err := os.ReadFile(file)
 		if err != nil {
 			return fmt.Errorf("failed to read migration file %s: %w", file, err)
@@ -312,21 +326,21 @@ func findProjectRoot() (string, error) {
 }
 
 // createTestUsers creates test users for authentication
-func (s *TestSuite) createTestUsers(t *testing.T) {
+func (s *testSuite) createTestUsers(t *testing.T) {
 	ctx := context.Background()
 
 	// Create regular test user
-	s.TestUser = s.createUser(t, ctx, "test@example.com", "testpassword123", "Test User", string(auth.RoleUser))
-	
+	s.TestUser = s.createUser(ctx, t, "test@example.com", "testpassword123", "Test User", string(auth.RoleUser))
+
 	// Create second test user
-	s.TestUser2 = s.createUser(t, ctx, "test2@example.com", "testpassword123", "Test User 2", string(auth.RoleUser))
-	
+	s.TestUser2 = s.createUser(ctx, t, "test2@example.com", "testpassword123", "Test User 2", string(auth.RoleUser))
+
 	// Create admin user
-	s.AdminUser = s.createUser(t, ctx, "admin@example.com", "adminpassword123", "Admin User", string(auth.RoleAdmin))
+	s.AdminUser = s.createUser(ctx, t, "admin@example.com", "adminpassword123", "Admin User", string(auth.RoleAdmin))
 }
 
 // createUser creates a single test user
-func (s *TestSuite) createUser(t *testing.T, ctx context.Context, email, password, name, role string) *TestUser {
+func (s *testSuite) createUser(ctx context.Context, t *testing.T, email, password, name, role string) *testUser {
 	// Hash password
 	hashedPassword, err := s.PasswordManager.HashPassword(password)
 	require.NoError(t, err)
@@ -342,20 +356,16 @@ func (s *TestSuite) createUser(t *testing.T, ctx context.Context, email, passwor
 	})
 	require.NoError(t, err)
 
-	// Convert pgtype.UUID to uuid.UUID
-	userID, err := uuid.FromBytes(user.ID.Bytes[:])
-	require.NoError(t, err)
-
 	// Generate token pair
 	accessToken, refreshToken, err := s.JWTManager.GenerateTokenPair(ctx, &user)
 	require.NoError(t, err)
 
 	// Create API key
-	_, apiKey, err := s.APIKeyManager.GenerateAPIKey(ctx, userID, "Test Key", nil)
+	_, apiKey, err := s.APIKeyManager.GenerateAPIKey(ctx, user.ID, "Test Key", nil)
 	require.NoError(t, err)
 
-	return &TestUser{
-		ID:           userID,
+	return &testUser{
+		ID:           user.ID,
 		Email:        email,
 		Password:     password,
 		Name:         name,
@@ -367,7 +377,7 @@ func (s *TestSuite) createUser(t *testing.T, ctx context.Context, email, passwor
 }
 
 // MakeRequest makes an HTTP request and returns the response
-func (s *TestSuite) MakeRequest(method, path string, body interface{}, headers map[string]string) *APIResponse {
+func (s *testSuite) MakeRequest(method, path string, body interface{}, headers map[string]string) *APIResponse {
 	var reqBody []byte
 	if body != nil {
 		var err error
@@ -410,17 +420,17 @@ func (s *TestSuite) MakeRequest(method, path string, body interface{}, headers m
 }
 
 // MakeAuthenticatedRequest makes a request with JWT token
-func (s *TestSuite) MakeAuthenticatedRequest(method, path string, body interface{}, user *TestUser) *APIResponse {
+func (s *testSuite) MakeAuthenticatedRequest(method, path string, body interface{}, user *testUser) *APIResponse {
 	headers := map[string]string{
-		"Authorization": "Bearer " + user.AccessToken,
+		auth.JWTAuthorizationHeader: "Bearer " + user.AccessToken,
 	}
 	return s.MakeRequest(method, path, body, headers)
 }
 
 // MakeAPIKeyRequest makes a request with API key
-func (s *TestSuite) MakeAPIKeyRequest(method, path string, body interface{}, user *TestUser) *APIResponse {
+func (s *testSuite) MakeAPIKeyRequest(method, path string, body interface{}, user *testUser) *APIResponse {
 	headers := map[string]string{
-		"Authorization": "Bearer " + user.APIKey,
+		auth.APIKeyAuthorizationHeader: user.APIKey,
 	}
 	return s.MakeRequest(method, path, body, headers)
 }
@@ -437,41 +447,22 @@ func AssertErrorResponse(t *testing.T, resp *APIResponse, expectedStatus int, ex
 		if errorMsg, ok := resp.Body["error"]; ok {
 			assert.Contains(t, errorMsg, expectedError)
 		} else {
-			t.Errorf("Expected error message containing '%s', but no error field found in response: %+v", expectedError, resp.Body)
+			if resp.Body["raw_body"] != nil {
+				assert.Contains(t, resp.Body["raw_body"], expectedError)
+			} else {
+				t.Errorf("Expected error message containing '%s', but no error field found in response: %+v", expectedError, resp.Body)
+			}
 		}
 	}
-}
-
-// Helper functions for UUID conversion
-func uuidToPgUUID(id uuid.UUID) pgtype.UUID {
-	var pgUUID pgtype.UUID
-	pgUUID.Bytes = id
-	pgUUID.Valid = true
-	return pgUUID
-}
-
-func pgUUIDToUUID(pgUUID pgtype.UUID) uuid.UUID {
-	var id uuid.UUID
-	if pgUUID.Valid {
-		copy(id[:], pgUUID.Bytes[:])
-	}
-	return id
-}
-
-func getEnvOrDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
 }
 
 // WaitForCondition waits for a condition to be true with timeout
 func WaitForCondition(t *testing.T, condition func() bool, timeout time.Duration, message string) {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
-	
+
 	timeoutCh := time.After(timeout)
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -492,37 +483,37 @@ type ContainerInfo struct {
 }
 
 // GetContainerInfo returns information about running test containers
-func (s *TestSuite) GetContainerInfo(t *testing.T) *ContainerInfo {
+func (s *testSuite) GetContainerInfo(t *testing.T) *ContainerInfo {
 	ctx := context.Background()
-	
+
 	host, err := s.PostgresContainer.Host(ctx)
 	require.NoError(t, err)
-	
+
 	port, err := s.PostgresContainer.MappedPort(ctx, "5432")
 	require.NoError(t, err)
-	
+
 	dbURL, err := getConnectionString(s.PostgresContainer, s.Config)
 	require.NoError(t, err)
-	
+
 	return &ContainerInfo{
 		PostgresHost: host,
 		PostgresPort: port.Int(),
 		DatabaseURL:  dbURL,
 	}
-} 
+}
 
 func getConnectionString(container *testcontainers.DockerContainer, config *config.Config) (string, error) {
 	ctx := context.Background()
-	
+
 	host, err := container.Host(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get container host: %w", err)
 	}
-	
+
 	port, err := container.MappedPort(ctx, "5432")
 	if err != nil {
 		return "", fmt.Errorf("failed to get container port: %w", err)
 	}
-	
+
 	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s", config.Database.User, config.Database.Password, host, port.Int(), config.Database.Name), nil
 }

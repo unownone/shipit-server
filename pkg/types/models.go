@@ -1,3 +1,4 @@
+// Package types provides the types for the models
 package types
 
 import (
@@ -8,37 +9,37 @@ import (
 
 // User represents a user in the system
 type User struct {
-	ID                      uuid.UUID  `json:"id" db:"id"`
-	Email                   string     `json:"email" db:"email"`
-	PasswordHash            string     `json:"-" db:"password_hash"`
-	Name                    string     `json:"name" db:"name"`
-	Role                    string     `json:"role" db:"role"`
-	IsActive                bool       `json:"is_active" db:"is_active"`
-	EmailVerified           bool       `json:"email_verified" db:"email_verified"`
-	EmailVerificationToken  *string    `json:"-" db:"email_verification_token"`
-	PasswordResetToken      *string    `json:"-" db:"password_reset_token"`
-	PasswordResetExpiresAt  *time.Time `json:"-" db:"password_reset_expires_at"`
-	LastLoginAt             *time.Time `json:"last_login_at" db:"last_login_at"`
-	FailedLoginAttempts     int        `json:"-" db:"failed_login_attempts"`
-	LockedUntil             *time.Time `json:"-" db:"locked_until"`
-	CreatedAt               time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt               time.Time  `json:"updated_at" db:"updated_at"`
+	ID                     uuid.UUID  `json:"id" db:"id"`
+	Email                  string     `json:"email" db:"email"`
+	PasswordHash           string     `json:"-" db:"password_hash"`
+	Name                   string     `json:"name" db:"name"`
+	Role                   string     `json:"role" db:"role"`
+	IsActive               bool       `json:"is_active" db:"is_active"`
+	EmailVerified          bool       `json:"email_verified" db:"email_verified"`
+	EmailVerificationToken *string    `json:"-" db:"email_verification_token"`
+	PasswordResetToken     *string    `json:"-" db:"password_reset_token"`
+	PasswordResetExpiresAt *time.Time `json:"-" db:"password_reset_expires_at"`
+	LastLoginAt            *time.Time `json:"last_login_at" db:"last_login_at"`
+	FailedLoginAttempts    int        `json:"-" db:"failed_login_attempts"`
+	LockedUntil            *time.Time `json:"-" db:"locked_until"`
+	CreatedAt              time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt              time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 // APIKey represents an API key for programmatic access
 type APIKey struct {
-	ID         uuid.UUID   `json:"id" db:"id"`
-	UserID     uuid.UUID   `json:"user_id" db:"user_id"`
-	Name       string      `json:"name" db:"name"`
-	Prefix     string      `json:"prefix" db:"prefix"`
-	Hash       string      `json:"-" db:"hash"`
-	IsActive   bool        `json:"is_active" db:"is_active"`
-	LastUsedAt *time.Time  `json:"last_used_at" db:"last_used_at"`
-	ExpiresAt  *time.Time  `json:"expires_at" db:"expires_at"`
-	Scopes     []string    `json:"scopes" db:"scopes"`
-	CreatedAt  time.Time   `json:"created_at" db:"created_at"`
-	UpdatedAt  time.Time   `json:"updated_at" db:"updated_at"`
-	User       *User       `json:"user" db:"user"` // User ForeignKey
+	ID         uuid.UUID  `json:"id" db:"id"`
+	UserID     uuid.UUID  `json:"user_id" db:"user_id"`
+	Name       string     `json:"name" db:"name"`
+	Prefix     string     `json:"prefix" db:"prefix"`
+	Hash       string     `json:"-" db:"hash"`
+	IsActive   bool       `json:"is_active" db:"is_active"`
+	LastUsedAt *time.Time `json:"last_used_at" db:"last_used_at"`
+	ExpiresAt  *time.Time `json:"expires_at" db:"expires_at"`
+	Scopes     []string   `json:"scopes" db:"scopes"`
+	CreatedAt  time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at" db:"updated_at"`
+	User       *User      `json:"user" db:"user"` // User ForeignKey
 }
 
 // RefreshToken represents a JWT refresh token
@@ -53,15 +54,15 @@ type RefreshToken struct {
 
 // UserSession represents an active user session
 type UserSession struct {
-	ID           uuid.UUID  `json:"id" db:"id"`
-	UserID       uuid.UUID  `json:"user_id" db:"user_id"`
-	SessionToken string     `json:"-" db:"session_token"`
-	IPAddress    *string    `json:"ip_address" db:"ip_address"`
-	UserAgent    *string    `json:"user_agent" db:"user_agent"`
-	IsActive     bool       `json:"is_active" db:"is_active"`
-	ExpiresAt    time.Time  `json:"expires_at" db:"expires_at"`
-	CreatedAt    time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at" db:"updated_at"`
+	ID           uuid.UUID `json:"id" db:"id"`
+	UserID       uuid.UUID `json:"user_id" db:"user_id"`
+	SessionToken string    `json:"-" db:"session_token"`
+	IPAddress    *string   `json:"ip_address" db:"ip_address"`
+	UserAgent    *string   `json:"user_agent" db:"user_agent"`
+	IsActive     bool      `json:"is_active" db:"is_active"`
+	ExpiresAt    time.Time `json:"expires_at" db:"expires_at"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // LoginAttempt represents a login attempt for security monitoring
@@ -120,7 +121,7 @@ type Connection struct {
 	EndedAt    *time.Time `json:"ended_at" db:"ended_at"`
 }
 
-// Role validation
+// IsValidRole validates the role
 func IsValidRole(role string) bool {
 	validRoles := []string{"user", "admin", "moderator"}
 	for _, validRole := range validRoles {
@@ -131,12 +132,12 @@ func IsValidRole(role string) bool {
 	return false
 }
 
-// Protocol validation
+// IsValidProtocol validates the protocol
 func IsValidProtocol(protocol string) bool {
 	return protocol == "http" || protocol == "tcp"
 }
 
-// Status validation
+// IsValidStatus validates the status
 func IsValidStatus(status string) bool {
 	validStatuses := []string{"active", "inactive", "terminated", "connecting", "error"}
 	for _, validStatus := range validStatuses {
@@ -145,4 +146,4 @@ func IsValidStatus(status string) bool {
 		}
 	}
 	return false
-} 
+}

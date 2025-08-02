@@ -11,18 +11,20 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/unwonone/shipit-server/internal/config"
-	"github.com/unwonone/shipit-server/internal/database"
-	"github.com/unwonone/shipit-server/internal/database/sqlc"
+	"github.com/unownone/shipit-server/internal/config"
+	"github.com/unownone/shipit-server/internal/database"
+	"github.com/unownone/shipit-server/internal/database/sqlc"
 )
 
 // UserRole represents user roles
 type UserRole string
 
+// JWTAuthorizationHeader is the authorization header for JWT tokens
 const (
-	RoleUser      UserRole = "user"
-	RoleAdmin     UserRole = "admin"
-	RoleModerator UserRole = "moderator"
+	JWTAuthorizationHeader string   = "Authorization"
+	RoleUser               UserRole = "user"
+	RoleAdmin              UserRole = "admin"
+	RoleModerator          UserRole = "moderator"
 )
 
 // JWTClaims represents the claims stored in a JWT token
@@ -38,15 +40,17 @@ type JWTClaims struct {
 // JWT access tokens are stateless and never stored in database
 // Only refresh tokens are stored for secure token refresh
 type JWTManager struct {
-	config *config.JWTConfig
-	db     *database.Database
+	config     *config.JWTConfig
+	db         *database.Database
+	AuthHeader string
 }
 
 // NewJWTManager creates a new JWT manager
 func NewJWTManager(cfg *config.JWTConfig, db *database.Database) *JWTManager {
 	return &JWTManager{
-		config: cfg,
-		db:     db,
+		config:     cfg,
+		db:         db,
+		AuthHeader: JWTAuthorizationHeader,
 	}
 }
 
@@ -74,18 +78,13 @@ func (jm *JWTManager) GenerateTokenPair(ctx context.Context, user *sqlc.Users) (
 func (jm *JWTManager) generateAccessToken(user *sqlc.Users) (string, error) {
 	now := time.Now()
 
-	userID, err := uuid.FromBytes(user.ID.Bytes[:])
-	if err != nil {
-		return "", fmt.Errorf("failed to convert user ID to UUID: %w", err)
-	}
-
 	claims := JWTClaims{
-		UserID: userID,
+		UserID: user.ID,
 		Email:  user.Email,
 		Role:   UserRole(user.Role),
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        uuid.New().String(),
-			Subject:   userID.String(),
+			Subject:   user.ID.String(),
 			Audience:  []string{jm.config.Audience},
 			Issuer:    jm.config.Issuer,
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -114,7 +113,9 @@ func (jm *JWTManager) generateRefreshToken(ctx context.Context, user *sqlc.Users
 	// Convert expiry time to pgtype.Timestamptz
 	var pgExpiresAt pgtype.Timestamptz
 	expiresAt := time.Now().Add(jm.config.RefreshTokenExpiry)
-	pgExpiresAt.Scan(expiresAt)
+	if err := pgExpiresAt.Scan(expiresAt); err != nil {
+		return "", fmt.Errorf("failed to scan expires at: %w", err)
+	}
 
 	// Create refresh token record in database
 	_, err = jm.db.Queries.CreateRefreshToken(ctx, sqlc.CreateRefreshTokenParams{
@@ -175,12 +176,6 @@ func (jm *JWTManager) RefreshAccessToken(ctx context.Context, refreshTokenString
 	}
 
 	// Get the user information
-	var userID uuid.UUID
-	err = userID.Scan(refreshTokenRow.UserID.Bytes)
-	if err != nil {
-		return "", fmt.Errorf("invalid user ID")
-	}
-
 	user, err := jm.db.Queries.GetUserByID(ctx, refreshTokenRow.UserID)
 	if err != nil {
 		return "", fmt.Errorf("user not found")
@@ -211,9 +206,11 @@ func (jm *JWTManager) RevokeRefreshToken(ctx context.Context, refreshTokenString
 
 // RevokeAllUserTokens revokes all refresh tokens for a user
 func (jm *JWTManager) RevokeAllUserTokens(ctx context.Context, userID uuid.UUID) error {
-	// Convert UUID to pgtype.UUID
-	var pgUserID pgtype.UUID
-	pgUserID.Scan(userID.String())
+	// Convert UUID to uuid.UUID
+	var pgUserID uuid.UUID
+	if err := pgUserID.Scan(userID.String()); err != nil {
+		return fmt.Errorf("failed to scan user ID: %w", err)
+	}
 
 	err := jm.db.Queries.RevokeAllUserRefreshTokens(ctx, pgUserID)
 	if err != nil {
@@ -242,9 +239,11 @@ func (jm *JWTManager) GetUserFromToken(ctx context.Context, tokenString string) 
 		return nil, err
 	}
 
-	// Convert UUID to pgtype.UUID for database query
-	var pgUserID pgtype.UUID
-	pgUserID.Scan(claims.UserID.String())
+	// Convert UUID to uuid.UUID for database query
+	var pgUserID uuid.UUID
+	if err := pgUserID.Scan(claims.UserID.String()); err != nil {
+		return nil, fmt.Errorf("failed to scan user ID: %w", err)
+	}
 
 	// Fetch the user from the database to get the latest information
 	// and ensure the user is still active

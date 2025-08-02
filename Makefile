@@ -34,13 +34,16 @@ test-integration: test-unit ## Run integration tests (alias for test-unit with t
 
 test-coverage: ## Run tests with coverage
 	@echo "Running tests with coverage using testcontainers..."
-	go test -v ./test/... -coverprofile=coverage.out -covermode=atomic
-	go tool cover -html=coverage.out -o coverage.html
+	go test -v ./test/... -coverprofile=coverage.out -covermode=atomic -coverpkg=./...
+	go tool cover -func=coverage.out -o=coverage.txt
+	go tool cover -html=coverage.out -o=coverage.html
 	@echo "Coverage report generated: coverage.html"
+	@echo "Coverage summary:"
+	@go tool cover -func=coverage.out | grep total
 
 test-clean: ## Clean test artifacts
 	@echo "Cleaning test artifacts..."
-	rm -f coverage.out coverage.html
+	rm -f coverage.out coverage.html coverage.txt coverage.json coverage.xml
 
 lint: ## Run linter
 	golangci-lint run
@@ -51,7 +54,7 @@ format: ## Format code
 
 clean: ## Clean build artifacts
 	rm -rf bin/
-	rm -f coverage.out coverage.html
+	rm -f coverage.out coverage.html coverage.txt coverage.json coverage.xml
 
 # Docker
 docker-up: ## Start database services only

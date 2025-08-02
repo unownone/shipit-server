@@ -1,3 +1,4 @@
+// Package auth provides the API key management functionality
 package auth
 
 import (
@@ -11,25 +12,29 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/unwonone/shipit-server/internal/database"
-	"github.com/unwonone/shipit-server/internal/database/sqlc"
-	"github.com/unwonone/shipit-server/internal/logger"
+	"github.com/unownone/shipit-server/internal/database"
+	"github.com/unownone/shipit-server/internal/database/sqlc"
+	"github.com/unownone/shipit-server/internal/logger"
 )
 
+// APIKey constants
 const (
-	APIKeyPrefix = "shipit_" // 7 bytes
-	APIKeyLength = 32 // Length of the random part
+	APIKeyAuthorizationHeader string = "X-API-KEY" // APIKeyAuthorizationHeader is the authorization header for API keys
+	APIKeyPrefix              string = "shipit_"   // APIKeyPrefix is the prefix for API keys
+	APIKeyLength              int    = 32          // APIKeyLength is the length of the random part of the API key
 )
 
 // APIKeyManager handles API key generation, validation, and management
 type APIKeyManager struct {
-	db *database.Database
+	db         *database.Database
+	AuthHeader string
 }
 
 // NewAPIKeyManager creates a new API key manager
 func NewAPIKeyManager(db *database.Database) *APIKeyManager {
 	return &APIKeyManager{
-		db: db,
+		db:         db,
+		AuthHeader: APIKeyAuthorizationHeader,
 	}
 }
 
@@ -49,19 +54,17 @@ func (akm *APIKeyManager) GenerateAPIKey(ctx context.Context, userID uuid.UUID, 
 	keyHash := sha256.Sum256([]byte(fullKey))
 	keyHashString := base64.URLEncoding.EncodeToString(keyHash[:])
 
-	// Convert UUID to pgtype.UUID
-	var pgUserID pgtype.UUID
-	pgUserID.Scan(userID.String())
-
 	// Convert time to pgtype.Timestamptz
 	var pgExpiresAt pgtype.Timestamptz
 	if expiresAt != nil {
-		pgExpiresAt.Scan(*expiresAt)
+		if err := pgExpiresAt.Scan(*expiresAt); err != nil {
+			return nil, "", fmt.Errorf("failed to scan expires at: %w", err)
+		}
 	}
 
 	// Create the API key record using SQLC
 	params := sqlc.CreateAPIKeyParams{
-		UserID:    pgUserID,
+		UserID:    userID,
 		Name:      name,
 		Prefix:    APIKeyPrefix + randomPart[:8] + ".", // Store a prefix for identification -> 16 bytes
 		Hash:      keyHashString,
@@ -95,17 +98,7 @@ func (akm *APIKeyManager) ValidateAPIKey(ctx context.Context, key string) (*sqlc
 	}
 
 	// Get the associated user (the GetAPIKeyByHash already includes user info)
-	var userID uuid.UUID
-	err = userID.Scan(apiKeyRow.UserID.Bytes)
-	if err != nil {
-		return nil, nil, fmt.Errorf("invalid user ID")
-	}
-	
-	// Convert back to pgtype.UUID for the query
-	var pgUserIDForQuery pgtype.UUID
-	pgUserIDForQuery.Scan(userID.String())
-	
-	user, err := akm.db.Queries.GetUserByID(ctx, pgUserIDForQuery)
+	user, err := akm.db.Queries.GetUserByID(ctx, apiKeyRow.UserID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("user not found")
 	}
@@ -124,9 +117,7 @@ func (akm *APIKeyManager) ValidateAPIKey(ctx context.Context, key string) (*sqlc
 	err = akm.db.Queries.UpdateAPIKeyLastUsed(ctx, apiKeyRow.ID)
 	if err != nil {
 		// Log error but don't fail the validation
-		var keyUUID uuid.UUID
-		keyUUID.Scan(apiKeyRow.ID.Bytes)
-		logger.WithError(err).WithField("api_key_id", keyUUID.String()).Warn("Failed to update API key last used timestamp")
+		logger.WithError(err).WithField("api_key_id", apiKeyRow.ID.String()).Warn("Failed to update API key last used timestamp")
 	}
 
 	return &user, &apiKeyRow, nil
@@ -134,11 +125,7 @@ func (akm *APIKeyManager) ValidateAPIKey(ctx context.Context, key string) (*sqlc
 
 // ListAPIKeys returns all API keys for a user
 func (akm *APIKeyManager) ListAPIKeys(ctx context.Context, userID uuid.UUID) ([]sqlc.ListAPIKeysByUserRow, error) {
-	// Convert UUID to pgtype.UUID
-	var pgUserID pgtype.UUID
-	pgUserID.Scan(userID.String())
-
-	apiKeys, err := akm.db.Queries.ListAPIKeysByUser(ctx, pgUserID)
+	apiKeys, err := akm.db.Queries.ListAPIKeysByUser(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list API keys: %w", err)
 	}
@@ -148,14 +135,9 @@ func (akm *APIKeyManager) ListAPIKeys(ctx context.Context, userID uuid.UUID) ([]
 
 // RevokeAPIKey revokes an API key
 func (akm *APIKeyManager) RevokeAPIKey(ctx context.Context, keyID, userID uuid.UUID) error {
-	// Convert UUIDs to pgtype.UUID
-	var pgKeyID, pgUserID pgtype.UUID
-	pgKeyID.Scan(keyID.String())
-	pgUserID.Scan(userID.String())
-
 	err := akm.db.Queries.RevokeAPIKey(ctx, sqlc.RevokeAPIKeyParams{
-		ID:     pgKeyID,
-		UserID: pgUserID,
+		ID:     keyID,
+		UserID: userID,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to revoke API key: %w", err)
@@ -166,20 +148,14 @@ func (akm *APIKeyManager) RevokeAPIKey(ctx context.Context, keyID, userID uuid.U
 
 // GetAPIKey returns a specific API key for a user
 func (akm *APIKeyManager) GetAPIKey(ctx context.Context, keyID, userID uuid.UUID) (*sqlc.ListAPIKeysByUserRow, error) {
-	// Convert UUID to pgtype.UUID
-	var pgUserID pgtype.UUID
-	pgUserID.Scan(userID.String())
-
 	// List all user keys and filter for the specific one
-	apiKeys, err := akm.db.Queries.ListAPIKeysByUser(ctx, pgUserID)
+	apiKeys, err := akm.db.Queries.ListAPIKeysByUser(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get API keys: %w", err)
 	}
 
 	for _, key := range apiKeys {
-		var keyUUID uuid.UUID
-		err := keyUUID.Scan(key.ID.Bytes)
-		if err == nil && keyUUID == keyID {
+		if key.ID == keyID {
 			return &key, nil
 		}
 	}
@@ -198,7 +174,7 @@ func (akm *APIKeyManager) CleanupExpiredKeys(ctx context.Context) error {
 }
 
 // UpdateAPIKeyName updates the name of an API key (not implemented in SQLC queries)
-func (akm *APIKeyManager) UpdateAPIKeyName(ctx context.Context, keyID, userID uuid.UUID, newName string) error {
+func (akm *APIKeyManager) UpdateAPIKeyName(_ context.Context, _, _ uuid.UUID, _ string) error {
 	// This would need a custom SQL query to be added to the queries
 	return fmt.Errorf("update API key name not implemented - needs custom SQL query")
-} 
+}

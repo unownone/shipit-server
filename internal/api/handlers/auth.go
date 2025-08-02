@@ -5,8 +5,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	"github.com/unwonone/shipit-server/internal/auth"
+	"github.com/unownone/shipit-server/internal/auth"
 )
 
 // AuthHandler handles authentication-related API endpoints
@@ -78,13 +77,9 @@ func (h *AuthHandler) ValidateToken(c *gin.Context) {
 
 	// Try API key validation first
 	if user, _, err := h.apiKeyManager.ValidateAPIKey(ctx, token); err == nil {
-		// Extract UUID from user
-		var userID uuid.UUID
-		userID.Scan(user.ID.Bytes)
-
 		c.JSON(http.StatusOK, ValidateTokenResponse{
 			Valid:    true,
-			UserID:   userID.String(),
+			UserID:   user.ID.String(),
 			AuthType: "api_key",
 		})
 		return
@@ -92,13 +87,9 @@ func (h *AuthHandler) ValidateToken(c *gin.Context) {
 
 	// Try JWT validation
 	if user, err := h.jwtManager.GetUserFromToken(ctx, token); err == nil {
-		// Extract UUID from user
-		var userID uuid.UUID
-		userID.Scan(user.ID.Bytes)
-
 		c.JSON(http.StatusOK, ValidateTokenResponse{
 			Valid:    true,
-			UserID:   userID.String(),
+			UserID:   user.ID.String(),
 			AuthType: "jwt",
 		})
 		return
@@ -113,32 +104,38 @@ func (h *AuthHandler) ValidateToken(c *gin.Context) {
 
 // GetTokenInfo provides detailed information about a token (for debugging/admin)
 func (h *AuthHandler) GetTokenInfo(c *gin.Context) {
+	var token string
+	
+	// Check Authorization header first (for JWT tokens and API keys)
 	authHeader := c.GetHeader("Authorization")
-	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Authorization header with Bearer token required",
-		})
-		return
+	if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
+		token = authHeader[7:] // Remove "Bearer " prefix
+	} else {
+		// Check X-API-KEY header for API keys
+		apiKeyHeader := c.GetHeader("X-API-KEY")
+		if apiKeyHeader != "" {
+			token = apiKeyHeader
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Authorization header with Bearer token or X-API-KEY header required",
+			})
+			return
+		}
 	}
 
-	token := authHeader[7:]
 	ctx := c.Request.Context()
 
 	// Try API key validation
 	if user, apiKey, err := h.apiKeyManager.ValidateAPIKey(ctx, token); err == nil {
-		var userID, keyID uuid.UUID
-		userID.Scan(user.ID.Bytes)
-		keyID.Scan(apiKey.ID.Bytes)
-
 		c.JSON(http.StatusOK, gin.H{
 			"valid":      true,
 			"auth_type":  "api_key",
-			"user_id":    userID.String(),
+			"user_id":    user.ID.String(),
 			"user_email": user.Email,
 			"user_name":  user.Name,
 			"user_role":  user.Role,
 			"key_info": gin.H{
-				"id":           keyID.String(),
+				"id":           apiKey.ID.String(),
 				"name":         apiKey.Name,
 				"created_at":   apiKey.CreatedAt.Time,
 				"last_used_at": apiKey.LastUsedAt.Time,
@@ -150,13 +147,10 @@ func (h *AuthHandler) GetTokenInfo(c *gin.Context) {
 
 	// Try JWT validation
 	if user, err := h.jwtManager.GetUserFromToken(ctx, token); err == nil {
-		var userID uuid.UUID
-		userID.Scan(user.ID.Bytes)
-
 		c.JSON(http.StatusOK, gin.H{
 			"valid":      true,
 			"auth_type":  "jwt",
-			"user_id":    userID.String(),
+			"user_id":    user.ID.String(),
 			"user_email": user.Email,
 			"user_name":  user.Name,
 			"user_role":  user.Role,
@@ -168,4 +162,4 @@ func (h *AuthHandler) GetTokenInfo(c *gin.Context) {
 		"valid": false,
 		"error": "Invalid or expired token",
 	})
-} 
+}

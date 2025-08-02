@@ -1,3 +1,4 @@
+// Package main is the main package for the ShipIt server
 package main
 
 import (
@@ -10,16 +11,15 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	_ "github.com/unwonone/shipit-server/docs" // Import generated docs
-	"github.com/unwonone/shipit-server/internal/api"
-	"github.com/unwonone/shipit-server/internal/auth"
-	"github.com/unwonone/shipit-server/internal/config"
-	"github.com/unwonone/shipit-server/internal/database"
-	"github.com/unwonone/shipit-server/internal/database/sqlc"
-	"github.com/unwonone/shipit-server/internal/logger"
+	_ "github.com/unownone/shipit-server/docs" // Import generated docs
+	"github.com/unownone/shipit-server/internal/api"
+	"github.com/unownone/shipit-server/internal/auth"
+	"github.com/unownone/shipit-server/internal/config"
+	"github.com/unownone/shipit-server/internal/database"
+	"github.com/unownone/shipit-server/internal/database/sqlc"
+	"github.com/unownone/shipit-server/internal/logger"
 )
 
 // @title           ShipIt Server API
@@ -51,7 +51,7 @@ func main() {
 	// Initialize logger first
 	logger.Init()
 	log := logger.Get()
-	
+
 	// Load configuration with secrets
 	configPath := os.Getenv("SHIPIT_CONFIG_PATH")
 	secretsPath := os.Getenv("SHIPIT_SECRETS_PATH")
@@ -120,7 +120,7 @@ func main() {
 	}
 
 	log.WithField("port", cfg.Server.HTTPPort).Info("Starting server")
-	
+
 	if cfg.Server.Environment != "production" {
 		log.WithField("swagger_url", fmt.Sprintf("http://localhost:%d/swagger/index.html", cfg.Server.HTTPPort)).
 			Info("Swagger documentation available")
@@ -202,16 +202,12 @@ func initializeFirstAdmin(db *database.Database, passwordManager *auth.PasswordM
 		return fmt.Errorf("failed to create admin user: %w", err)
 	}
 
-	// Extract UUID for logging
-	var userID uuid.UUID
-	userID.Scan(adminUser.ID.Bytes)
-
 	log.WithFields(map[string]interface{}{
-		"email": adminUser.Email,
-		"user_id": userID.String(),
+		"email":   adminUser.Email,
+		"user_id": adminUser.ID.String(),
 	}).Info("Created admin user")
-	
+
 	log.WithField("password", cfg.Secrets.Admin.Password).Warn("Admin password set - please change after first login")
 
 	return nil
-} 
+}

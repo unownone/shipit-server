@@ -9,6 +9,7 @@ import (
 	"context"
 	"net/netip"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -19,7 +20,7 @@ WHERE tunnel_id = $1 AND is_active = true AND started_at < $2
 `
 
 type CloseInactiveConnectionsParams struct {
-	TunnelID  pgtype.UUID        `db:"tunnel_id" json:"tunnel_id"`
+	TunnelID  uuid.UUID          `db:"tunnel_id" json:"tunnel_id"`
 	StartedAt pgtype.Timestamptz `db:"started_at" json:"started_at"`
 }
 
@@ -33,7 +34,7 @@ SELECT COUNT(*) FROM connections
 WHERE tunnel_id = $1 AND is_active = true
 `
 
-func (q *Queries) CountActiveConnections(ctx context.Context, tunnelID pgtype.UUID) (int64, error) {
+func (q *Queries) CountActiveConnections(ctx context.Context, tunnelID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countActiveConnections, tunnelID)
 	var count int64
 	err := row.Scan(&count)
@@ -49,11 +50,11 @@ INSERT INTO connections (
 `
 
 type CreateConnectionParams struct {
-	TunnelID   pgtype.UUID `db:"tunnel_id" json:"tunnel_id"`
-	RemoteAddr netip.Addr  `db:"remote_addr" json:"remote_addr"`
-	LocalAddr  netip.Addr  `db:"local_addr" json:"local_addr"`
-	BytesIn    int64       `db:"bytes_in" json:"bytes_in"`
-	BytesOut   int64       `db:"bytes_out" json:"bytes_out"`
+	TunnelID   uuid.UUID  `db:"tunnel_id" json:"tunnel_id"`
+	RemoteAddr netip.Addr `db:"remote_addr" json:"remote_addr"`
+	LocalAddr  netip.Addr `db:"local_addr" json:"local_addr"`
+	BytesIn    int64      `db:"bytes_in" json:"bytes_in"`
+	BytesOut   int64      `db:"bytes_out" json:"bytes_out"`
 }
 
 func (q *Queries) CreateConnection(ctx context.Context, arg CreateConnectionParams) (Connections, error) {
@@ -88,12 +89,12 @@ INSERT INTO tunnel_analytics (
 `
 
 type CreateTunnelAnalyticsParams struct {
-	TunnelID        pgtype.UUID   `db:"tunnel_id" json:"tunnel_id"`
-	RequestsCount   int64         `db:"requests_count" json:"requests_count"`
-	BytesIn         int64         `db:"bytes_in" json:"bytes_in"`
-	BytesOut        int64         `db:"bytes_out" json:"bytes_out"`
-	ResponseTimeAvg pgtype.Float4 `db:"response_time_avg" json:"response_time_avg"`
-	ErrorCount      int64         `db:"error_count" json:"error_count"`
+	TunnelID        uuid.UUID          `db:"tunnel_id" json:"tunnel_id"`
+	RequestsCount   int64              `db:"requests_count" json:"requests_count"`
+	BytesIn         int64              `db:"bytes_in" json:"bytes_in"`
+	BytesOut        int64              `db:"bytes_out" json:"bytes_out"`
+	ResponseTimeAvg pgtype.Float4      `db:"response_time_avg" json:"response_time_avg"`
+	ErrorCount      int64              `db:"error_count" json:"error_count"`
 	Timestamp       pgtype.Timestamptz `db:"timestamp" json:"timestamp"`
 }
 
@@ -136,7 +137,7 @@ WHERE tunnel_id = $1 AND is_active = true
 ORDER BY started_at DESC
 `
 
-func (q *Queries) GetActiveConnections(ctx context.Context, tunnelID pgtype.UUID) ([]Connections, error) {
+func (q *Queries) GetActiveConnections(ctx context.Context, tunnelID uuid.UUID) ([]Connections, error) {
 	rows, err := q.db.Query(ctx, getActiveConnections, tunnelID)
 	if err != nil {
 		return nil, err
@@ -174,7 +175,7 @@ LIMIT $3 OFFSET $4
 `
 
 type GetConnectionHistoryParams struct {
-	TunnelID  pgtype.UUID        `db:"tunnel_id" json:"tunnel_id"`
+	TunnelID  uuid.UUID          `db:"tunnel_id" json:"tunnel_id"`
 	StartedAt pgtype.Timestamptz `db:"started_at" json:"started_at"`
 	Limit     int32              `db:"limit" json:"limit"`
 	Offset    int32              `db:"offset" json:"offset"`
@@ -222,7 +223,7 @@ ORDER BY timestamp DESC
 `
 
 type GetTunnelAnalyticsParams struct {
-	TunnelID    pgtype.UUID        `db:"tunnel_id" json:"tunnel_id"`
+	TunnelID    uuid.UUID          `db:"tunnel_id" json:"tunnel_id"`
 	Timestamp   pgtype.Timestamptz `db:"timestamp" json:"timestamp"`
 	Timestamp_2 pgtype.Timestamptz `db:"timestamp_2" json:"timestamp_2"`
 }
@@ -270,17 +271,17 @@ GROUP BY tunnel_id
 `
 
 type GetTunnelAnalyticsSummaryParams struct {
-	TunnelID  pgtype.UUID        `db:"tunnel_id" json:"tunnel_id"`
+	TunnelID  uuid.UUID          `db:"tunnel_id" json:"tunnel_id"`
 	Timestamp pgtype.Timestamptz `db:"timestamp" json:"timestamp"`
 }
 
 type GetTunnelAnalyticsSummaryRow struct {
-	TunnelID        pgtype.UUID `db:"tunnel_id" json:"tunnel_id"`
-	TotalRequests   int64       `db:"total_requests" json:"total_requests"`
-	TotalBytesIn    int64       `db:"total_bytes_in" json:"total_bytes_in"`
-	TotalBytesOut   int64       `db:"total_bytes_out" json:"total_bytes_out"`
-	AvgResponseTime float64     `db:"avg_response_time" json:"avg_response_time"`
-	TotalErrors     int64       `db:"total_errors" json:"total_errors"`
+	TunnelID        uuid.UUID `db:"tunnel_id" json:"tunnel_id"`
+	TotalRequests   int64     `db:"total_requests" json:"total_requests"`
+	TotalBytesIn    int64     `db:"total_bytes_in" json:"total_bytes_in"`
+	TotalBytesOut   int64     `db:"total_bytes_out" json:"total_bytes_out"`
+	AvgResponseTime float64   `db:"avg_response_time" json:"avg_response_time"`
+	TotalErrors     int64     `db:"total_errors" json:"total_errors"`
 }
 
 func (q *Queries) GetTunnelAnalyticsSummary(ctx context.Context, arg GetTunnelAnalyticsSummaryParams) (GetTunnelAnalyticsSummaryRow, error) {
@@ -304,10 +305,10 @@ WHERE id = $1
 `
 
 type UpdateConnectionParams struct {
-	ID       pgtype.UUID `db:"id" json:"id"`
-	BytesIn  int64       `db:"bytes_in" json:"bytes_in"`
-	BytesOut int64       `db:"bytes_out" json:"bytes_out"`
-	IsActive bool        `db:"is_active" json:"is_active"`
+	ID       uuid.UUID `db:"id" json:"id"`
+	BytesIn  int64     `db:"bytes_in" json:"bytes_in"`
+	BytesOut int64     `db:"bytes_out" json:"bytes_out"`
+	IsActive bool      `db:"is_active" json:"is_active"`
 }
 
 func (q *Queries) UpdateConnection(ctx context.Context, arg UpdateConnectionParams) error {
@@ -334,7 +335,7 @@ WHERE tunnel_id = $1 AND DATE(timestamp) = CURRENT_DATE
 `
 
 type UpdateTunnelAnalyticsParams struct {
-	TunnelID        pgtype.UUID   `db:"tunnel_id" json:"tunnel_id"`
+	TunnelID        uuid.UUID     `db:"tunnel_id" json:"tunnel_id"`
 	RequestsCount   int64         `db:"requests_count" json:"requests_count"`
 	BytesIn         int64         `db:"bytes_in" json:"bytes_in"`
 	BytesOut        int64         `db:"bytes_out" json:"bytes_out"`

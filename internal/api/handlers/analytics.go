@@ -1,3 +1,4 @@
+// Package handlers provides the API handlers for the analytics endpoints
 package handlers
 
 import (
@@ -7,10 +8,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/unwonone/shipit-server/internal/api/middleware"
-	"github.com/unwonone/shipit-server/internal/database"
-	"github.com/unwonone/shipit-server/internal/logger"
+	"github.com/unownone/shipit-server/internal/api/middleware"
+	"github.com/unownone/shipit-server/internal/database"
+	"github.com/unownone/shipit-server/internal/logger"
 )
 
 // AnalyticsHandler handles analytics-related API endpoints
@@ -27,13 +27,13 @@ func NewAnalyticsHandler(db *database.Database) *AnalyticsHandler {
 
 // AnalyticsOverviewResponse represents user analytics overview
 type AnalyticsOverviewResponse struct {
-	TotalTunnels    int64  `json:"total_tunnels"`
-	ActiveTunnels   int64  `json:"active_tunnels"`
-	TotalRequests   int64  `json:"total_requests"`
-	TotalBandwidth  string `json:"total_bandwidth"`  // Human readable (e.g., "2.3GB")
-	TotalBandwidthBytes int64 `json:"total_bandwidth_bytes"`
-	Period          string `json:"period"`
-	GeneratedAt     string `json:"generated_at"`
+	TotalTunnels        int64  `json:"total_tunnels"`
+	ActiveTunnels       int64  `json:"active_tunnels"`
+	TotalRequests       int64  `json:"total_requests"`
+	TotalBandwidth      string `json:"total_bandwidth"` // Human readable (e.g., "2.3GB")
+	TotalBandwidthBytes int64  `json:"total_bandwidth_bytes"`
+	Period              string `json:"period"`
+	GeneratedAt         string `json:"generated_at"`
 }
 
 // TunnelAnalyticsResponse represents specific tunnel analytics
@@ -46,23 +46,23 @@ type TunnelAnalyticsResponse struct {
 
 // TunnelMetricsSummary represents summarized tunnel metrics
 type TunnelMetricsSummary struct {
-	TotalRequests     int64   `json:"total_requests"`
-	TotalBandwidth    string  `json:"total_bandwidth"`
-	TotalBandwidthBytes int64 `json:"total_bandwidth_bytes"`
-	AverageLatency    float32 `json:"average_latency_ms"`
-	ErrorRate         float32 `json:"error_rate_percent"`
-	UptimePercent     float32 `json:"uptime_percent"`
+	TotalRequests       int64   `json:"total_requests"`
+	TotalBandwidth      string  `json:"total_bandwidth"`
+	TotalBandwidthBytes int64   `json:"total_bandwidth_bytes"`
+	AverageLatency      float32 `json:"average_latency_ms"`
+	ErrorRate           float32 `json:"error_rate_percent"`
+	UptimePercent       float32 `json:"uptime_percent"`
 }
 
 // TrafficAnalyticsResponse represents traffic analytics
 type TrafficAnalyticsResponse struct {
-	TopVisitors   []VisitorStat   `json:"top_visitors"`
-	TopPaths      []PathStat      `json:"top_paths"`
-	StatusCodes   map[string]int64 `json:"status_codes"`
-	UserAgents    []UserAgentStat `json:"user_agents"`
-	Countries     []CountryStat   `json:"countries"`
-	Period        string          `json:"period"`
-	GeneratedAt   string          `json:"generated_at"`
+	TopVisitors []VisitorStat    `json:"top_visitors"`
+	TopPaths    []PathStat       `json:"top_paths"`
+	StatusCodes map[string]int64 `json:"status_codes"`
+	UserAgents  []UserAgentStat  `json:"user_agents"`
+	Countries   []CountryStat    `json:"countries"`
+	Period      string           `json:"period"`
+	GeneratedAt string           `json:"generated_at"`
 }
 
 // VisitorStat represents visitor statistics
@@ -82,16 +82,16 @@ type PathStat struct {
 
 // UserAgentStat represents user agent statistics
 type UserAgentStat struct {
-	UserAgent string `json:"user_agent"`
-	Requests  int64  `json:"requests"`
+	UserAgent string  `json:"user_agent"`
+	Requests  int64   `json:"requests"`
 	Percent   float32 `json:"percent"`
 }
 
 // CountryStat represents country statistics
 type CountryStat struct {
-	CountryCode string `json:"country_code"`
-	CountryName string `json:"country_name"`
-	Requests    int64  `json:"requests"`
+	CountryCode string  `json:"country_code"`
+	CountryName string  `json:"country_name"`
+	Requests    int64   `json:"requests"`
 	Percent     float32 `json:"percent"`
 }
 
@@ -126,9 +126,14 @@ func (h *AnalyticsHandler) GetOverview(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	// Convert UUID to pgtype.UUID
-	var pgUserID pgtype.UUID
-	pgUserID.Scan(userID.String())
+	// Convert UUID to uuid.UUID
+	var pgUserID uuid.UUID
+	if err := pgUserID.Scan(userID.String()); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to process user ID",
+		})
+		return
+	}
 
 	// Get total tunnels count
 	totalTunnels, err := h.db.Queries.CountTunnelsByUser(ctx, pgUserID)
@@ -150,7 +155,7 @@ func (h *AnalyticsHandler) GetOverview(c *gin.Context) {
 
 	// In a real implementation, this would query analytics tables based on period
 	// For now, return simulated data
-	totalRequests = 1234                              // TODO: Implement real analytics query
+	totalRequests = 1234             // TODO: Implement real analytics query
 	totalBandwidthBytes = 2470000000 // ~2.3GB in bytes
 
 	response := AnalyticsOverviewResponse{
@@ -187,8 +192,8 @@ func (h *AnalyticsHandler) GetTunnelStats(c *gin.Context) {
 	tunnelIDStr := c.Param("tunnel_id")
 	tunnelID, err := uuid.Parse(tunnelIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid tunnel ID",
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Tunnel not found",
 		})
 		return
 	}
@@ -207,8 +212,13 @@ func (h *AnalyticsHandler) GetTunnelStats(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	// Convert UUIDs
-	var pgTunnelID pgtype.UUID
-	pgTunnelID.Scan(tunnelID.String())
+	var pgTunnelID uuid.UUID
+	if err := pgTunnelID.Scan(tunnelID.String()); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to process tunnel ID",
+		})
+		return
+	}
 
 	// Verify tunnel ownership
 	tunnel, err := h.db.Queries.GetTunnelByID(ctx, pgTunnelID)
@@ -219,9 +229,7 @@ func (h *AnalyticsHandler) GetTunnelStats(c *gin.Context) {
 		return
 	}
 
-	var tunnelUserID uuid.UUID
-	tunnelUserID.Scan(tunnel.UserID.Bytes)
-	if tunnelUserID != userID {
+	if tunnel.UserID != userID {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "Tunnel not found",
 		})
@@ -233,7 +241,7 @@ func (h *AnalyticsHandler) GetTunnelStats(c *gin.Context) {
 	analytics := []TunnelAnalyticsPoint{}
 
 	// Simulate analytics data for now
-	var totalRequests, totalBandwidthBytes int64 = 456, 1024*1024*50 // 50MB
+	var totalRequests, totalBandwidthBytes int64 = 456, 1024 * 1024 * 50 // 50MB
 	var totalLatency, errorCount int64 = 125, 5
 
 	// Calculate metrics summary
@@ -333,4 +341,4 @@ func formatBandwidth(bytes int64) string {
 		exp++
 	}
 	return strconv.FormatFloat(float64(bytes)/float64(div), 'f', 1, 64) + " " + []string{"KB", "MB", "GB", "TB"}[exp]
-} 
+}

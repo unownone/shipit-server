@@ -52,7 +52,7 @@ func (pm *PasswordManager) IsPasswordValid(password string) error {
 	// Check for at least one letter and one number
 	hasLetter := false
 	hasNumber := false
-	
+
 	for _, char := range password {
 		if char >= 'a' && char <= 'z' || char >= 'A' && char <= 'Z' {
 			hasLetter = true
@@ -80,4 +80,4 @@ func GenerateSecureToken(length int) (string, error) {
 		return "", fmt.Errorf("failed to generate secure token: %w", err)
 	}
 	return base64.URLEncoding.EncodeToString(bytes), nil
-} 
+}
