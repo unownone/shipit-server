@@ -98,3 +98,9 @@ vendor/
 
 # Yarn Integrity file
 .yarn-integrity 
+
+coverage.json
+coverage.txt
+coverage.xml
+coverage.html
+coverage.out
