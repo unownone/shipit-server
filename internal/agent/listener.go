@@ -291,12 +291,7 @@ func (al *Listener) handleConnection(conn net.Conn) {
 // validateTunnelAccess validates that the tunnel exists and the client has access
 func (al *Listener) validateTunnelAccess(ctx context.Context, tunnelID uuid.UUID, regPayload *TunnelRegistrationPayload) (*tunnel.Tunnel, error) {
 	// Get tunnel from database to verify it exists
-	var pgTunnelID uuid.UUID
-	if err := pgTunnelID.Scan(tunnelID.String()); err != nil {
-		return nil, fmt.Errorf("failed to scan tunnel ID: %w", err)
-	}
-
-	dbTunnel, err := al.db.Queries.GetTunnelByID(ctx, pgTunnelID)
+	dbTunnel, err := al.db.Queries.GetTunnelByID(ctx, tunnelID)
 	if err != nil {
 		return nil, fmt.Errorf("tunnel not found: %w", err)
 	}

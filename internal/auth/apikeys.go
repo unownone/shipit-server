@@ -54,12 +54,6 @@ func (akm *APIKeyManager) GenerateAPIKey(ctx context.Context, userID uuid.UUID, 
 	keyHash := sha256.Sum256([]byte(fullKey))
 	keyHashString := base64.URLEncoding.EncodeToString(keyHash[:])
 
-	// Convert UUID to uuid.UUID
-	var pgUserID uuid.UUID
-	if err := pgUserID.Scan(userID.String()); err != nil {
-		return nil, "", fmt.Errorf("failed to scan user ID: %w", err)
-	}
-
 	// Convert time to pgtype.Timestamptz
 	var pgExpiresAt pgtype.Timestamptz
 	if expiresAt != nil {
@@ -70,7 +64,7 @@ func (akm *APIKeyManager) GenerateAPIKey(ctx context.Context, userID uuid.UUID, 
 
 	// Create the API key record using SQLC
 	params := sqlc.CreateAPIKeyParams{
-		UserID:    pgUserID,
+		UserID:    userID,
 		Name:      name,
 		Prefix:    APIKeyPrefix + randomPart[:8] + ".", // Store a prefix for identification -> 16 bytes
 		Hash:      keyHashString,
@@ -131,13 +125,7 @@ func (akm *APIKeyManager) ValidateAPIKey(ctx context.Context, key string) (*sqlc
 
 // ListAPIKeys returns all API keys for a user
 func (akm *APIKeyManager) ListAPIKeys(ctx context.Context, userID uuid.UUID) ([]sqlc.ListAPIKeysByUserRow, error) {
-	// Convert UUID to uuid.UUID
-	var pgUserID uuid.UUID
-	if err := pgUserID.Scan(userID.String()); err != nil {
-		return nil, fmt.Errorf("failed to scan user ID: %w", err)
-	}
-
-	apiKeys, err := akm.db.Queries.ListAPIKeysByUser(ctx, pgUserID)
+	apiKeys, err := akm.db.Queries.ListAPIKeysByUser(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list API keys: %w", err)
 	}
@@ -147,18 +135,9 @@ func (akm *APIKeyManager) ListAPIKeys(ctx context.Context, userID uuid.UUID) ([]
 
 // RevokeAPIKey revokes an API key
 func (akm *APIKeyManager) RevokeAPIKey(ctx context.Context, keyID, userID uuid.UUID) error {
-	// Convert UUIDs to uuid.UUID
-	var pgKeyID, pgUserID uuid.UUID
-	if err := pgKeyID.Scan(keyID.String()); err != nil {
-		return fmt.Errorf("failed to scan key ID: %w", err)
-	}
-	if err := pgUserID.Scan(userID.String()); err != nil {
-		return fmt.Errorf("failed to scan user ID: %w", err)
-	}
-
 	err := akm.db.Queries.RevokeAPIKey(ctx, sqlc.RevokeAPIKeyParams{
-		ID:     pgKeyID,
-		UserID: pgUserID,
+		ID:     keyID,
+		UserID: userID,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to revoke API key: %w", err)
@@ -169,14 +148,8 @@ func (akm *APIKeyManager) RevokeAPIKey(ctx context.Context, keyID, userID uuid.U
 
 // GetAPIKey returns a specific API key for a user
 func (akm *APIKeyManager) GetAPIKey(ctx context.Context, keyID, userID uuid.UUID) (*sqlc.ListAPIKeysByUserRow, error) {
-	// Convert UUID to uuid.UUID
-	var pgUserID uuid.UUID
-	if err := pgUserID.Scan(userID.String()); err != nil {
-		return nil, fmt.Errorf("failed to scan user ID: %w", err)
-	}
-
 	// List all user keys and filter for the specific one
-	apiKeys, err := akm.db.Queries.ListAPIKeysByUser(ctx, pgUserID)
+	apiKeys, err := akm.db.Queries.ListAPIKeysByUser(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get API keys: %w", err)
 	}

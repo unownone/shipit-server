@@ -1,10 +1,11 @@
+---
 name: CI/CD Pipeline
 
 on:
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
   push:
-    branches: [ main, master ]
+    branches: [main, master]
 
 permissions:
   contents: read
@@ -19,7 +20,7 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: postgres:15-alpine
@@ -36,206 +37,217 @@ jobs:
           - 5432:5432
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: ${{ env.GO_VERSION }}
-        cache: true
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
-    - name: Install dependencies
-      run: |
-        go mod download
-        go mod verify
-        go install github.com/axw/gocov/gocov@latest
-        go install github.com/AlekSi/gocov-xml@latest
+      - name: Install dependencies
+        run: |
+          go mod download
+          go mod verify
+          go install github.com/axw/gocov/gocov@latest
+          go install github.com/AlekSi/gocov-xml@latest
 
-    # - name: Run linter
-    #   uses: golangci/golangci-lint-action@v8
-    #   with:
-    #     version: latest
-    #     args: --timeout=5m
+      # - name: Run linter
+      #   uses: golangci/golangci-lint-action@v8
+      #   with:
+      #     version: latest
+      #     args: --timeout=5m
 
-    - name: Run tests with coverage
-      run: |
-        go test -v ./test/... -coverprofile=coverage.out -covermode=atomic -coverpkg=./...
-        go tool cover -func=coverage.out -o=coverage.txt
-        go tool cover -html=coverage.out -o=coverage.html
-        gocov convert coverage.out > coverage.json
-        gocov-xml < coverage.json > coverage.xml
+      - name: Run tests with coverage
+        run: |
+          go test -v ./test/... -coverprofile=coverage.out -covermode=atomic \
+            -coverpkg=./...
+          go tool cover -func=coverage.out -o=coverage.txt
+          go tool cover -html=coverage.out -o=coverage.html
+          gocov convert coverage.out > coverage.json
+          gocov-xml < coverage.json > coverage.xml
 
-    - name: Check coverage threshold
-      run: |
-        # Extract total coverage percentage
-        COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-        echo "Total coverage: ${COVERAGE}%"
-        echo "Threshold: ${COVERAGE_THRESHOLD}%"
-        
-        # Convert to integer for comparison
-        COVERAGE_INT=$(echo $COVERAGE | cut -d. -f1)
-        THRESHOLD_INT=$COVERAGE_THRESHOLD
-        
-        if [ $COVERAGE_INT -lt $THRESHOLD_INT ]; then
-          echo "❌ Coverage ${COVERAGE}% is below threshold ${COVERAGE_THRESHOLD}%"
-          exit 1
-        else
-          echo "✅ Coverage ${COVERAGE}% meets threshold ${COVERAGE_THRESHOLD}%"
-        fi
+      - name: Check coverage threshold
+        run: |
+          # Extract total coverage percentage
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | \
+            awk '{print $3}' | sed 's/%//')
+          echo "Total coverage: ${COVERAGE}%"
+          echo "Threshold: ${COVERAGE_THRESHOLD}%"
 
-    - name: Upload coverage reports
-      uses: actions/upload-artifact@v4
-      with:
-        name: coverage-reports
-        path: |
-          coverage.out
-          coverage.html
-          coverage.txt
-          coverage.json
-          coverage.xml
+          # Convert to integer for comparison
+          COVERAGE_INT=$(echo $COVERAGE | cut -d. -f1)
+          THRESHOLD_INT=$COVERAGE_THRESHOLD
 
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
-        verbose: true
+          if [ $COVERAGE_INT -lt $THRESHOLD_INT ]; then
+            echo "❌ Coverage ${COVERAGE}% is below threshold \
+              ${COVERAGE_THRESHOLD}%"
+            exit 1
+          else
+            echo "✅ Coverage ${COVERAGE}% meets threshold \
+              ${COVERAGE_THRESHOLD}%"
+          fi
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            coverage.out
+            coverage.html
+            coverage.txt
+            coverage.json
+            coverage.xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+          verbose: true
 
   build:
     name: Build Application
     runs-on: ubuntu-latest
     needs: test
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: ${{ env.GO_VERSION }}
-        cache: true
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
-    - name: Build application
-      run: |
-        make build
-        make build-linux
+      - name: Build application
+        run: |
+          make build
+          make build-linux
 
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-binaries
-        path: bin/
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-binaries
+          path: bin/
 
   security:
     name: Security Scan
     runs-on: ubuntu-latest
     needs: test
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
-      with:
-        scan-type: 'fs'
-        scan-ref: '.'
-        format: 'sarif'
-        output: 'trivy-results.sarif'
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
 
-    - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v3
-      if: always()
-      with:
-        sarif_file: 'trivy-results.sarif'
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
 
   quality-gates:
     name: Quality Gates
     runs-on: ubuntu-latest
     needs: [test, security]
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Download coverage reports
-      uses: actions/download-artifact@v4
-      with:
-        name: coverage-reports
-        path: ./
+      - name: Download coverage reports
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-reports
+          path: ./
 
-    - name: Quality Gate Check
-      run: |
-        echo "🔍 Running Quality Gates..."
-        
-        # Check if coverage file exists
-        if [ ! -f coverage.txt ]; then
-          echo "❌ Coverage file not found"
-          exit 1
-        fi
-        
-        # Extract total coverage
-        COVERAGE=$(grep "total:" coverage.txt | awk '{print $3}' | sed 's/%//')
-        echo "📊 Total Coverage: ${COVERAGE}%"
-        
-        # Check coverage threshold
-        COVERAGE_INT=$(echo $COVERAGE | cut -d. -f1)
-        THRESHOLD_INT=$COVERAGE_THRESHOLD
-        
-        if [ $COVERAGE_INT -lt $THRESHOLD_INT ]; then
-          echo "❌ QUALITY GATE FAILED: Coverage ${COVERAGE}% is below threshold ${COVERAGE_THRESHOLD}%"
-          echo "🚨 Please add more tests to improve coverage"
-          exit 1
-        else
-          echo "✅ QUALITY GATE PASSED: Coverage ${COVERAGE}% meets threshold ${COVERAGE_THRESHOLD}%"
-        fi
-        
-        echo "🎉 All quality gates passed!"
+      - name: Quality Gate Check
+        run: |
+          echo "🔍 Running Quality Gates..."
 
-    - name: Comment PR with coverage results
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
-          let coverage = 'N/A';
-          
-          try {
-            const coverageText = fs.readFileSync('coverage.txt', 'utf8');
-            const match = coverageText.match(/total:\s+\(statements\)\s+(\d+\.\d+)%/);
-            if (match) {
-              coverage = match[1] + '%';
+          # Check if coverage file exists
+          if [ ! -f coverage.txt ]; then
+            echo "❌ Coverage file not found"
+            exit 1
+          fi
+
+          # Extract total coverage
+          COVERAGE=$(grep "total:" coverage.txt | awk '{print $3}' | \
+            sed 's/%//')
+          echo "📊 Total Coverage: ${COVERAGE}%"
+
+          # Check coverage threshold
+          COVERAGE_INT=$(echo $COVERAGE | cut -d. -f1)
+          THRESHOLD_INT=$COVERAGE_THRESHOLD
+
+          if [ $COVERAGE_INT -lt $THRESHOLD_INT ]; then
+            echo "❌ QUALITY GATE FAILED: Coverage ${COVERAGE}% is below \
+              threshold ${COVERAGE_THRESHOLD}%"
+            echo "🚨 Please add more tests to improve coverage"
+            exit 1
+          else
+            echo "✅ QUALITY GATE PASSED: Coverage ${COVERAGE}% meets \
+              threshold ${COVERAGE_THRESHOLD}%"
+          fi
+
+          echo "🎉 All quality gates passed!"
+
+      - name: Comment PR with coverage results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let coverage = 'N/A';
+
+            try {
+              const coverageText = fs.readFileSync('coverage.txt', 'utf8');
+              const match = coverageText.match(
+                /total:\s+\(statements\)\s+(\d+\.\d+)%/
+              );
+              if (match) {
+                coverage = match[1] + '%';
+              }
+            } catch (error) {
+              console.log('Could not read coverage file');
             }
-          } catch (error) {
-            console.log('Could not read coverage file');
-          }
-          
-          const threshold = process.env.COVERAGE_THRESHOLD;
-          const coverageNum = parseFloat(coverage);
-          const thresholdNum = parseFloat(threshold);
-          
-          let status = '✅';
-          let message = `Coverage: ${coverage} (meets threshold of ${threshold}%)`;
-          
-          if (coverageNum < thresholdNum) {
-            status = '❌';
-            message = `Coverage: ${coverage} (below threshold of ${threshold}%)`;
-          }
-          
-          const comment = `## Quality Gate Results
-          
-          ${status} **Coverage Quality Gate**: ${message}
-          
-          ---
-          *This comment was automatically generated by the CI/CD pipeline.*`;
-          
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: comment
-          }); 
+
+            const threshold = process.env.COVERAGE_THRESHOLD;
+            const coverageNum = parseFloat(coverage);
+            const thresholdNum = parseFloat(threshold);
+
+            let status = '✅';
+            let message = `Coverage: ${coverage} (meets threshold of \
+              ${threshold}%)`;
+
+            if (coverageNum < thresholdNum) {
+              status = '❌';
+              message = `Coverage: ${coverage} (below threshold of \
+                ${threshold}%)`;
+            }
+
+            const comment = `## Quality Gate Results
+
+            ${status} **Coverage Quality Gate**: ${message}
+
+            ---
+            *This comment was automatically generated by the CI/CD pipeline.*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });

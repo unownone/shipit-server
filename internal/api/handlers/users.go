@@ -272,17 +272,8 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	// Convert UUID to uuid.UUID
-	var pgUserID uuid.UUID
-	if err := pgUserID.Scan(userID.String()); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to process user ID",
-		})
-		return
-	}
-
 	// Get current user
-	user, err := h.db.Queries.GetUserByID(ctx, pgUserID)
+	user, err := h.db.Queries.GetUserByID(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "User not found",
