@@ -177,14 +177,26 @@ func (am *AuthMiddleware) CombinedAuth() gin.HandlerFunc {
 				c.Abort()
 				return
 			}
-			jwtAuthHeader = parts[1]
-			// try jwt auth
-			result := am.authenticateJWT(c.Request.Context(), jwtAuthHeader)
+			token := parts[1]
+			
+			// try jwt auth first
+			result := am.authenticateJWT(c.Request.Context(), token)
 			if result.Success {
 				setAuthContext(c, result)
 				c.Next()
 				return
 			}
+			
+			// If JWT auth failed, try API key auth if the token looks like an API key
+			if strings.HasPrefix(token, auth.APIKeyPrefix) {
+				result := am.authenticateAPIKey(c.Request.Context(), token)
+				if result.Success {
+					setAuthContext(c, result)
+					c.Next()
+					return
+				}
+			}
+			
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "Invalid or expired token",
 			})
@@ -333,3 +345,4 @@ func GetCurrentUserRole(c *gin.Context) (auth.UserRole, bool) {
 	roleObj, ok := role.(auth.UserRole)
 	return roleObj, ok
 }
+

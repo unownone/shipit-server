@@ -447,7 +447,11 @@ func AssertErrorResponse(t *testing.T, resp *APIResponse, expectedStatus int, ex
 		if errorMsg, ok := resp.Body["error"]; ok {
 			assert.Contains(t, errorMsg, expectedError)
 		} else {
-			t.Errorf("Expected error message containing '%s', but no error field found in response: %+v", expectedError, resp.Body)
+			if resp.Body["raw_body"] != nil {
+				assert.Contains(t, resp.Body["raw_body"], expectedError)
+			} else {
+				t.Errorf("Expected error message containing '%s', but no error field found in response: %+v", expectedError, resp.Body)
+			}
 		}
 	}
 }

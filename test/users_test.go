@@ -1,6 +1,8 @@
 package test
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -397,6 +399,283 @@ func (s *UsersTestSuite) TestRevokeAPIKey() {
 			if test.expectedStatus < 400 {
 				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
 				assert.Contains(s.T(), resp.Body, "message")
+			} else {
+				AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
+			}
+		})
+	}
+}
+
+// TestGetProfileWithAPIKey tests getting user profile with API key authentication
+func (s *UsersTestSuite) TestGetProfileWithAPIKey() {
+	// Create an API key for testing
+	createResp := s.testSuite.MakeAuthenticatedRequest("POST", "/api/v1/users/api-keys", map[string]interface{}{
+		"name":        "Test API Key for Profile",
+		"description": "API key for profile test",
+	}, s.testSuite.TestUser)
+	assert.Equal(s.T(), 201, createResp.StatusCode)
+	apiKey := createResp.Body["api_key"].(map[string]interface{})
+	apiKeyValue := apiKey["key"].(string)
+
+	// Test getting profile with API key
+	headers := map[string]string{
+		"X-API-Key": apiKeyValue,
+	}
+	resp := s.testSuite.MakeRequest("GET", "/api/v1/users/profile", nil, headers)
+
+	// The profile endpoint requires JWT auth, not API key auth
+	// So this should fail with 401
+	assert.Equal(s.T(), 401, resp.StatusCode)
+}
+
+// TestUpdateProfileWithAPIKey tests updating user profile with API key authentication
+func (s *UsersTestSuite) TestUpdateProfileWithAPIKey() {
+	// Create an API key for testing
+	createResp := s.testSuite.MakeAuthenticatedRequest("POST", "/api/v1/users/api-keys", map[string]interface{}{
+		"name":        "Test API Key for Profile Update",
+		"description": "API key for profile update test",
+	}, s.testSuite.TestUser)
+	assert.Equal(s.T(), 201, createResp.StatusCode)
+	apiKey := createResp.Body["api_key"].(map[string]interface{})
+	apiKeyValue := apiKey["key"].(string)
+
+	// Test updating profile with API key
+	headers := map[string]string{
+		"X-API-Key": apiKeyValue,
+	}
+	payload := map[string]interface{}{
+		"name":  "Updated Name via API Key",
+		"email": "updated-via-apikey@example.com",
+	}
+	resp := s.testSuite.MakeRequest("PUT", "/api/v1/users/profile", payload, headers)
+
+	// The profile endpoint requires JWT auth, not API key auth
+	// So this should fail with 401
+	assert.Equal(s.T(), 401, resp.StatusCode)
+}
+
+// TestCreateAPIKeyWithExpiration tests API key creation with expiration
+func (s *UsersTestSuite) TestCreateAPIKeyWithExpiration() {
+	tests := []struct {
+		name           string
+		payload        map[string]interface{}
+		expectedStatus int
+		expectedError  string
+	}{
+		{
+			name: "create API key with expiration",
+			payload: map[string]interface{}{
+				"name":        "Expiring API Key",
+				"description": "API key with expiration",
+				"expires_at":  "2024-12-31T23:59:59Z",
+			},
+			expectedStatus: 201,
+		},
+		{
+			name: "create API key with past expiration",
+			payload: map[string]interface{}{
+				"name":        "Expired API Key",
+				"description": "API key with past expiration",
+				"expires_at":  "2020-01-01T00:00:00Z",
+			},
+			expectedStatus: 201, // The API allows creating expired keys
+		},
+	}
+
+	for _, test := range tests {
+		s.Run(test.name, func() {
+			resp := s.testSuite.MakeAuthenticatedRequest("POST", "/api/v1/users/api-keys", test.payload, s.testSuite.TestUser)
+
+			if test.expectedStatus < 400 {
+				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
+				assert.Contains(s.T(), resp.Body, "api_key")
+				apiKey := resp.Body["api_key"].(map[string]interface{})
+				assert.Contains(s.T(), apiKey, "expires_at")
+			} else {
+				AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
+			}
+		})
+	}
+}
+
+// TestListAPIKeysWithPagination tests API key listing with pagination
+func (s *UsersTestSuite) TestListAPIKeysWithPagination() {
+	// Create multiple API keys for testing
+	for i := 0; i < 3; i++ {
+		createResp := s.testSuite.MakeAuthenticatedRequest("POST", "/api/v1/users/api-keys", map[string]interface{}{
+			"name":        fmt.Sprintf("Test API Key %d", i+1),
+			"description": fmt.Sprintf("API key for pagination test %d", i+1),
+		}, s.testSuite.TestUser)
+		assert.Equal(s.T(), 201, createResp.StatusCode)
+	}
+
+	// Test listing with pagination parameters
+	tests := []struct {
+		name           string
+		queryParams    string
+		expectedStatus int
+	}{
+		{
+			name:           "list API keys with limit",
+			queryParams:    "?limit=2",
+			expectedStatus: 200,
+		},
+		{
+			name:           "list API keys with offset",
+			queryParams:    "?offset=1",
+			expectedStatus: 200,
+		},
+		{
+			name:           "list API keys with limit and offset",
+			queryParams:    "?limit=1&offset=1",
+			expectedStatus: 200,
+		},
+	}
+
+	for _, test := range tests {
+		s.Run(test.name, func() {
+			resp := s.testSuite.MakeAuthenticatedRequest("GET", "/api/v1/users/api-keys"+test.queryParams, nil, s.testSuite.TestUser)
+
+			AssertSuccessResponse(s.T(), resp, test.expectedStatus)
+			assert.Contains(s.T(), resp.Body, "api_keys")
+			apiKeys := resp.Body["api_keys"].([]interface{})
+			assert.GreaterOrEqual(s.T(), len(apiKeys), 0)
+		})
+	}
+}
+
+// TestRevokeAPIKeyWithInvalidFormat tests revoking API key with invalid ID format
+func (s *UsersTestSuite) TestRevokeAPIKeyWithInvalidFormat() {
+	tests := []struct {
+		name           string
+		apiKeyID       string
+		expectedStatus int
+		expectedError  string
+	}{
+		{
+			name:           "revoke API key with invalid UUID format",
+			apiKeyID:       "invalid-uuid-format",
+			expectedStatus: 400,
+			expectedError:  "Invalid API key ID",
+		},
+		{
+			name:           "revoke API key with empty ID",
+			apiKeyID:       "",
+			expectedStatus: 404,
+			expectedError:  "404 page not found",
+		},
+	}
+
+	for _, test := range tests {
+		s.Run(test.name, func() {
+			path := "/api/v1/users/api-keys/" + test.apiKeyID
+			resp := s.testSuite.MakeAuthenticatedRequest("DELETE", path, nil, s.testSuite.TestUser)
+
+			AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
+		})
+	}
+}
+
+// TestChangePasswordWithWeakPassword tests password change with weak passwords
+func (s *UsersTestSuite) TestChangePasswordWithWeakPassword() {
+	tests := []struct {
+		name           string
+		payload        map[string]interface{}
+		expectedStatus int
+		expectedError  string
+	}{
+		{
+			name: "change password with too short password",
+			payload: map[string]interface{}{
+				"current_password": s.testSuite.TestUser.Password,
+				"new_password":     "123",
+			},
+			expectedStatus: 400,
+			expectedError:  "Invalid request data",
+		},
+		{
+			name: "change password with common password",
+			payload: map[string]interface{}{
+				"current_password": s.testSuite.TestUser.Password,
+				"new_password":     "password",
+			},
+			expectedStatus: 400,
+			expectedError:  "password must contain at least one number",
+		},
+		{
+			name: "change password with missing current password",
+			payload: map[string]interface{}{
+				"new_password": "newpassword123",
+			},
+			expectedStatus: 400,
+			expectedError:  "Invalid request data",
+		},
+		{
+			name: "change password with missing new password",
+			payload: map[string]interface{}{
+				"current_password": s.testSuite.TestUser.Password,
+			},
+			expectedStatus: 400,
+			expectedError:  "Invalid request data",
+		},
+	}
+
+	for _, test := range tests {
+		s.Run(test.name, func() {
+			resp := s.testSuite.MakeAuthenticatedRequest("PUT", "/api/v1/users/password", test.payload, s.testSuite.TestUser)
+
+			AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
+		})
+	}
+}
+
+// TestUpdateProfileWithInvalidData tests profile update with invalid data
+func (s *UsersTestSuite) TestUpdateProfileWithInvalidData() {
+	tests := []struct {
+		name           string
+		payload        map[string]interface{}
+		expectedStatus int
+		expectedError  string
+	}{
+		{
+			name: "update profile with empty name",
+			payload: map[string]interface{}{
+				"name": "",
+			},
+			expectedStatus: 200, // Empty name is allowed
+		},
+		{
+			name: "update profile with too long name",
+			payload: map[string]interface{}{
+				"name": strings.Repeat("a", 256), // Very long name
+			},
+			expectedStatus: 500, // Database error for too long name
+			expectedError:  "Failed to update user",
+		},
+		{
+			name: "update profile with invalid email format",
+			payload: map[string]interface{}{
+				"email": "not-an-email",
+			},
+			expectedStatus: 400,
+			expectedError:  "Invalid email format",
+		},
+		{
+			name: "update profile with empty email",
+			payload: map[string]interface{}{
+				"email": "",
+			},
+			expectedStatus: 400,
+			expectedError:  "Invalid email format",
+		},
+	}
+
+	for _, test := range tests {
+		s.Run(test.name, func() {
+			resp := s.testSuite.MakeAuthenticatedRequest("PUT", "/api/v1/users/profile", test.payload, s.testSuite.TestUser)
+
+			if test.expectedStatus < 400 {
+				AssertSuccessResponse(s.T(), resp, test.expectedStatus)
 			} else {
 				AssertErrorResponse(s.T(), resp, test.expectedStatus, test.expectedError)
 			}

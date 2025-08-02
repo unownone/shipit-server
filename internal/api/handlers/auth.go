@@ -104,15 +104,25 @@ func (h *AuthHandler) ValidateToken(c *gin.Context) {
 
 // GetTokenInfo provides detailed information about a token (for debugging/admin)
 func (h *AuthHandler) GetTokenInfo(c *gin.Context) {
+	var token string
+	
+	// Check Authorization header first (for JWT tokens and API keys)
 	authHeader := c.GetHeader("Authorization")
-	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Authorization header with Bearer token required",
-		})
-		return
+	if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
+		token = authHeader[7:] // Remove "Bearer " prefix
+	} else {
+		// Check X-API-KEY header for API keys
+		apiKeyHeader := c.GetHeader("X-API-KEY")
+		if apiKeyHeader != "" {
+			token = apiKeyHeader
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Authorization header with Bearer token or X-API-KEY header required",
+			})
+			return
+		}
 	}
 
-	token := authHeader[7:]
 	ctx := c.Request.Context()
 
 	// Try API key validation
