@@ -1,7 +1,7 @@
 # ShipIt Server
 
 [![CI/CD Pipeline](https://github.com/unownone/shipit-server/workflows/CI/CD%20Pipeline/badge.svg)](https://github.com/unownone/shipit-server/actions)
-[![Coverage](https://codecov.io/gh/unownone/shipit-server/branch/main/graph/badge.svg)](https://codecov.io/gh/unownone/shipit-server)
+[![codecov](https://codecov.io/gh/unownone/shipit-server/graph/badge.svg?token=HO0WY5GC5W)](https://codecov.io/gh/unownone/shipit-server)
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/unownone/shipit-server?utm_source=oss&utm_medium=github&utm_campaign=unownone%2Fshipit-server&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
 A secure, high-performance tunneling server that creates secure tunnels to expose local services to the internet. Supports both HTTP and TCP tunneling with comprehensive authentication, analytics, and management capabilities.
