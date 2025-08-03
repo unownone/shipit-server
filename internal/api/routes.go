@@ -32,6 +32,14 @@ func SetupRoutes(
 	router.Use(middleware.CORSMiddleware(&config.CORS))
 
 	// Health check endpoint
+	// @Summary Health check
+	// @Description Check if the server is healthy
+	// @Tags system
+	// @Accept json
+	// @Produce json
+	// @Success 200 {object} map[string]interface{} "Server is healthy"
+	// @Failure 500 {object} map[string]interface{} "Server is unhealthy"
+	// @Router /health [get]
 	router.GET("/health", func(c *gin.Context) {
 		if err := db.Health(c.Request.Context()); err != nil {
 			c.JSON(500, gin.H{
@@ -112,18 +120,48 @@ func SetupRoutes(
 	admin.Use(authMiddleware.RequireRole(auth.RoleAdmin))
 	{
 		// Admin can see all users
+		// @Summary List all users (Admin only)
+		// @Description Get a list of all users in the system. Admin role required.
+		// @Tags admin
+		// @Accept json
+		// @Produce json
+		// @Security BearerAuth
+		// @Success 200 {object} map[string]interface{} "List of all users"
+		// @Failure 401 {object} map[string]interface{} "Unauthorized"
+		// @Failure 403 {object} map[string]interface{} "Forbidden - Admin role required"
+		// @Router /admin/users [get]
 		admin.GET("/users", func(c *gin.Context) {
 			// TODO: Implement admin user list endpoint
 			c.JSON(200, gin.H{"message": "Admin user list endpoint"})
 		})
 
 		// Admin can see all tunnels
+		// @Summary List all tunnels (Admin only)
+		// @Description Get a list of all tunnels in the system. Admin role required.
+		// @Tags admin
+		// @Accept json
+		// @Produce json
+		// @Security BearerAuth
+		// @Success 200 {object} map[string]interface{} "List of all tunnels"
+		// @Failure 401 {object} map[string]interface{} "Unauthorized"
+		// @Failure 403 {object} map[string]interface{} "Forbidden - Admin role required"
+		// @Router /admin/tunnels [get]
 		admin.GET("/tunnels", func(c *gin.Context) {
 			// TODO: Implement admin tunnel list endpoint
 			c.JSON(200, gin.H{"message": "Admin tunnel list endpoint"})
 		})
 
 		// System statistics
+		// @Summary Get system statistics (Admin only)
+		// @Description Get system-wide statistics and metrics. Admin role required.
+		// @Tags admin
+		// @Accept json
+		// @Produce json
+		// @Security BearerAuth
+		// @Success 200 {object} map[string]interface{} "System statistics"
+		// @Failure 401 {object} map[string]interface{} "Unauthorized"
+		// @Failure 403 {object} map[string]interface{} "Forbidden - Admin role required"
+		// @Router /admin/stats [get]
 		admin.GET("/stats", func(c *gin.Context) {
 			// TODO: Implement system stats endpoint
 			c.JSON(200, gin.H{"message": "System statistics endpoint"})

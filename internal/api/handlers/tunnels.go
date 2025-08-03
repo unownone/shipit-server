@@ -286,8 +286,9 @@ func (h *TunnelHandler) CreateTunnel(c *gin.Context) {
 }
 
 // ListTunnels lists user's tunnels - Control Plane API
+// ListTunnels lists user's tunnels - Control Plane API
 // @Summary List user tunnels
-// @Description Get a list of all tunnels for the authenticated user
+// @Description Get a list of tunnels belonging to the authenticated user
 // @Tags tunnels
 // @Accept json
 // @Produce json
@@ -435,8 +436,9 @@ func (h *TunnelHandler) GetTunnel(c *gin.Context) {
 }
 
 // DeleteTunnel terminates a tunnel - Control Plane API
+// DeleteTunnel deletes a tunnel - Control Plane API
 // @Summary Delete tunnel
-// @Description Delete a specific tunnel
+// @Description Delete a specific tunnel. This will terminate the tunnel and close all connections.
 // @Tags tunnels
 // @Accept json
 // @Produce json

@@ -11,9 +11,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
-	_ "github.com/unownone/shipit-server/docs" // Import generated docs
 	"github.com/unownone/shipit-server/internal/api"
 	"github.com/unownone/shipit-server/internal/auth"
 	"github.com/unownone/shipit-server/internal/config"
@@ -101,7 +98,14 @@ func main() {
 	}
 
 	// Set Gin mode
-	gin.SetMode(cfg.Server.Environment)
+	switch cfg.Server.Environment {
+	case "production":
+		gin.SetMode(gin.ReleaseMode)
+	case "development":
+		gin.SetMode(gin.DebugMode)
+	default:
+		gin.SetMode(gin.DebugMode)
+	}
 
 	// Initialize router
 	router := gin.New()
@@ -119,12 +123,7 @@ func main() {
 		jwtManager,
 		apiKeyManager,
 	)
-
-	// Swagger documentation endpoint
-	if cfg.Server.Environment != "production" {
-		router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-	}
-
+	
 	// Start server
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.Server.HTTPPort),
@@ -205,10 +204,12 @@ func initializeFirstAdmin(db *database.Database, passwordManager *auth.PasswordM
 	}
 
 	adminUser, err := db.Queries.CreateUser(ctx, sqlc.CreateUserParams{
-		Email:        cfg.Secrets.Admin.Email,
-		PasswordHash: hashedPassword,
-		Name:         "Administrator",
-		Role:         string(auth.RoleAdmin),
+		Email:         cfg.Secrets.Admin.Email,
+		PasswordHash:  hashedPassword,
+		Name:          "Administrator",
+		Role:          string(auth.RoleAdmin),
+		IsActive:      true,
+		EmailVerified: true,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create admin user: %w", err)

@@ -189,7 +189,19 @@ func (h *AnalyticsHandler) GetOverview(c *gin.Context) {
 }
 
 // GetTunnelStats returns specific tunnel analytics - Control Plane API
-// GET /api/analytics/tunnels/{tunnel_id}/stats?period=24h|7d|30d&metrics=requests,bandwidth,latency
+// @Summary Get tunnel analytics
+// @Description Get detailed analytics for a specific tunnel including metrics and time series data
+// @Tags analytics
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param tunnel_id path string true "Tunnel ID"
+// @Param period query string false "Time period for analytics" default(24h)
+// @Param metrics query string false "Metrics to include" default(requests,bandwidth,latency)
+// @Success 200 {object} TunnelAnalyticsResponse "Tunnel analytics"
+// @Failure 401 {object} map[string]interface{} "User not authenticated"
+// @Failure 404 {object} map[string]interface{} "Tunnel not found"
+// @Router /analytics/tunnels/{tunnel_id}/stats [get]
 func (h *AnalyticsHandler) GetTunnelStats(c *gin.Context) {
 	userID, exists := middleware.GetCurrentUserID(c)
 	if !exists {
@@ -280,7 +292,16 @@ func (h *AnalyticsHandler) GetTunnelStats(c *gin.Context) {
 }
 
 // GetTrafficAnalytics returns traffic analytics - Control Plane API
-// GET /api/analytics/traffic?period=24h|7d|30d
+// @Summary Get traffic analytics
+// @Description Get detailed traffic analytics including top visitors, paths, status codes, and geographic data
+// @Tags analytics
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param period query string false "Time period for analytics" default(24h)
+// @Success 200 {object} TrafficAnalyticsResponse "Traffic analytics"
+// @Failure 401 {object} map[string]interface{} "User not authenticated"
+// @Router /analytics/traffic [get]
 func (h *AnalyticsHandler) GetTrafficAnalytics(c *gin.Context) {
 	_, exists := middleware.GetCurrentUserID(c)
 	if !exists {

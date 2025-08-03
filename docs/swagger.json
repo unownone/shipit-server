@@ -69,6 +69,115 @@
                 }
             }
         },
+        "/analytics/traffic": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get detailed traffic analytics including top visitors, paths, status codes, and geographic data",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Get traffic analytics",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "24h",
+                        "description": "Time period for analytics",
+                        "name": "period",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Traffic analytics",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.TrafficAnalyticsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "User not authenticated",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/analytics/tunnels/{tunnel_id}/stats": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get detailed analytics for a specific tunnel including metrics and time series data",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Get tunnel analytics",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tunnel ID",
+                        "name": "tunnel_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "24h",
+                        "description": "Time period for analytics",
+                        "name": "period",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "default": "requests,bandwidth,latency",
+                        "description": "Metrics to include",
+                        "name": "metrics",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tunnel analytics",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.TunnelAnalyticsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "User not authenticated",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Tunnel not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/auth/token/info": {
             "get": {
                 "security": [
@@ -171,7 +280,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get a list of all tunnels for the authenticated user",
+                "description": "Get a list of tunnels belonging to the authenticated user",
                 "consumes": [
                     "application/json"
                 ],
@@ -340,7 +449,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Delete a specific tunnel",
+                "description": "Delete a specific tunnel. This will terminate the tunnel and close all connections.",
                 "consumes": [
                     "application/json"
                 ],
@@ -825,6 +934,23 @@
                 }
             }
         },
+        "handlers.CountryStat": {
+            "type": "object",
+            "properties": {
+                "country_code": {
+                    "type": "string"
+                },
+                "country_name": {
+                    "type": "string"
+                },
+                "percent": {
+                    "type": "number"
+                },
+                "requests": {
+                    "type": "integer"
+                }
+            }
+        },
         "handlers.CreateAPIKeyRequest": {
             "type": "object",
             "required": [
@@ -909,6 +1035,20 @@
                 }
             }
         },
+        "handlers.PathStat": {
+            "type": "object",
+            "properties": {
+                "bandwidth_bytes": {
+                    "type": "integer"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "requests": {
+                    "type": "integer"
+                }
+            }
+        },
         "handlers.RefreshTokenRequest": {
             "type": "object",
             "required": [
@@ -941,6 +1081,48 @@
                 }
             }
         },
+        "handlers.TrafficAnalyticsResponse": {
+            "type": "object",
+            "properties": {
+                "countries": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.CountryStat"
+                    }
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "period": {
+                    "type": "string"
+                },
+                "status_codes": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                },
+                "top_paths": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.PathStat"
+                    }
+                },
+                "top_visitors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.VisitorStat"
+                    }
+                },
+                "user_agents": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.UserAgentStat"
+                    }
+                }
+            }
+        },
         "handlers.TunnelAnalyticsPoint": {
             "type": "object",
             "properties": {
@@ -960,6 +1142,26 @@
                     "type": "number"
                 },
                 "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.TunnelAnalyticsResponse": {
+            "type": "object",
+            "properties": {
+                "metrics": {
+                    "$ref": "#/definitions/handlers.TunnelMetricsSummary"
+                },
+                "period": {
+                    "type": "string"
+                },
+                "time_series": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.TunnelAnalyticsPoint"
+                    }
+                },
+                "tunnel_id": {
                     "type": "string"
                 }
             }
@@ -993,6 +1195,29 @@
                 },
                 "updated_at": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.TunnelMetricsSummary": {
+            "type": "object",
+            "properties": {
+                "average_latency_ms": {
+                    "type": "number"
+                },
+                "error_rate_percent": {
+                    "type": "number"
+                },
+                "total_bandwidth": {
+                    "type": "string"
+                },
+                "total_bandwidth_bytes": {
+                    "type": "integer"
+                },
+                "total_requests": {
+                    "type": "integer"
+                },
+                "uptime_percent": {
+                    "type": "number"
                 }
             }
         },
@@ -1044,6 +1269,20 @@
                 }
             }
         },
+        "handlers.UserAgentStat": {
+            "type": "object",
+            "properties": {
+                "percent": {
+                    "type": "number"
+                },
+                "requests": {
+                    "type": "integer"
+                },
+                "user_agent": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.ValidateTokenRequest": {
             "type": "object",
             "required": [
@@ -1070,6 +1309,23 @@
                 },
                 "valid": {
                     "type": "boolean"
+                }
+            }
+        },
+        "handlers.VisitorStat": {
+            "type": "object",
+            "properties": {
+                "bandwidth_bytes": {
+                    "type": "integer"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "ip_address": {
+                    "type": "string"
+                },
+                "requests": {
+                    "type": "integer"
                 }
             }
         }

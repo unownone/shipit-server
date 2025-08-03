@@ -16,7 +16,6 @@ type Config struct {
 	Auth      AuthConfig      `mapstructure:"auth"`
 	JWT       JWTConfig       `mapstructure:"jwt"`
 	Database  DatabaseConfig  `mapstructure:"database"`
-	Redis     RedisConfig     `mapstructure:"redis"`
 	Tunnels   TunnelsConfig   `mapstructure:"tunnels"`
 	Analytics AnalyticsConfig `mapstructure:"analytics"`
 	CORS      CORSConfig      `mapstructure:"cors"`
@@ -73,14 +72,7 @@ func (c *DatabaseConfig) GetDSN() string {
 		c.Host, c.Port, c.User, c.Password, c.Name, c.SSLMode)
 }
 
-type RedisConfig struct {
-	Host       string `mapstructure:"host"`
-	Port       int    `mapstructure:"port"`
-	Password   string `mapstructure:"password"`
-	DB         int    `mapstructure:"db"`
-	MaxRetries int    `mapstructure:"max_retries"`
-	PoolSize   int    `mapstructure:"pool_size"`
-}
+
 
 type TunnelsConfig struct {
 	MaxPerUser         int           `mapstructure:"max_per_user"`
@@ -224,12 +216,7 @@ func setDefaults() {
 	viper.SetDefault("database.max_idle_connections", 5)
 	viper.SetDefault("database.connection_max_lifetime", "5m")
 
-	// Redis defaults
-	viper.SetDefault("redis.host", "localhost")
-	viper.SetDefault("redis.port", 6379)
-	viper.SetDefault("redis.db", 0)
-	viper.SetDefault("redis.max_retries", 3)
-	viper.SetDefault("redis.pool_size", 10)
+
 
 	// Tunnels defaults
 	viper.SetDefault("tunnels.max_per_user", 10)
@@ -317,7 +304,4 @@ func (c *Config) DatabaseDSN() string {
 	)
 }
 
-// RedisAddr returns the Redis address
-func (c *Config) RedisAddr() string {
-	return fmt.Sprintf("%s:%d", c.Redis.Host, c.Redis.Port)
-}
+

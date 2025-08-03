@@ -58,7 +58,7 @@ clean: ## Clean build artifacts
 
 # Docker
 docker-up: ## Start database services only
-	docker-compose up -d postgres redis
+	docker-compose up -d postgres
 
 docker-up-all: ## Start all services including server
 	docker-compose up -d
@@ -115,9 +115,6 @@ atlas-install: ## Install Atlas CLI
 	fi
 
 atlas-migrate-apply: ## Apply Atlas migrations to development database
-	docker-compose up -d postgres
-	@echo "Waiting for database to be ready..."
-	@sleep 3
 	atlas migrate apply --env dev
 
 atlas-migrate-status: ## Check Atlas migration status

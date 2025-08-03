@@ -575,7 +575,7 @@ database:
   max_idle_connections: 5
   connection_max_lifetime: "5m"
 
-redis:  # For session storage and caching
+
   host: "localhost"
   port: 6379
   password: ""

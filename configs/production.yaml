@@ -36,13 +36,7 @@ database:
   max_idle_connections: 10
   connection_max_lifetime: "10m"
 
-redis:
-  host: "redis"
-  port: 6379
-  password: ""
-  db: 0
-  max_retries: 5
-  pool_size: 20
+
 
 tunnels:
   max_per_user: 5  # Lower limit for production

@@ -24,28 +24,7 @@ services:
     # ports:
     #   - "5432:5432"
 
-  redis:
-    image: redis:7-alpine
-    container_name: shipit-redis-prod
-    command: redis-server ${SHIPIT_REDIS_PASSWORD:+--requirepass "$SHIPIT_REDIS_PASSWORD"}
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: 
-        - CMD
-        - redis-cli
-        - ${SHIPIT_REDIS_PASSWORD:+-a}
-        - ${SHIPIT_REDIS_PASSWORD:-}
-        - ping
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    networks:
-      - shipit-network
-    restart: unless-stopped
-    # Production security: don't expose port to host
-    # ports:
-    #   - "6379:6379"
+
 
   shipit-server:
     build: .
@@ -56,13 +35,10 @@ services:
       # Override for Docker networking and production settings
       SHIPIT_SERVER_ENVIRONMENT: production
       SHIPIT_DATABASE_HOST: postgres
-      SHIPIT_REDIS_HOST: redis
     ports:
       - "8080:8080"
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
@@ -101,8 +77,6 @@ services:
 
 volumes:
   postgres_data:
-    driver: local
-  redis_data:
     driver: local
 
 networks:
