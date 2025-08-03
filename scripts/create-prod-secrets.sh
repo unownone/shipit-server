@@ -36,10 +36,7 @@ echo -e "${YELLOW}Generating JWT secret key...${NC}"
 JWT_SECRET=$(generate_hex_key 64)
 echo "$JWT_SECRET" > secrets/prod_jwt_secret.txt
 
-# Generate Redis password
-echo -e "${YELLOW}Generating Redis password...${NC}"
-REDIS_PASSWORD=$(generate_password 32)
-echo "$REDIS_PASSWORD" > secrets/prod_redis_password.txt
+
 
 # Generate admin password
 echo -e "${YELLOW}Generating admin password...${NC}"
@@ -54,7 +51,7 @@ echo ""
 echo -e "${YELLOW}📋 Generated secrets:${NC}"
 echo "Database password: secrets/prod_db_password.txt"
 echo "JWT secret key: secrets/prod_jwt_secret.txt"
-echo "Redis password: secrets/prod_redis_password.txt"
+
 echo "Admin password: secrets/prod_admin_password.txt"
 echo ""
 echo -e "${RED}⚠️  IMPORTANT SECURITY NOTES:${NC}"

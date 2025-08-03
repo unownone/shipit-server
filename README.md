@@ -49,7 +49,7 @@ A secure, high-performance tunneling server that creates secure tunnels to expos
 
 - Go 1.24+
 - PostgreSQL 16+
-- Redis 7+ (optional, for advanced features)
+
 - Docker & Docker Compose (for easy setup)
 
 ### Development Setup
@@ -197,7 +197,7 @@ SHIPIT_SECRET_ADMIN_PASSWORD=your_admin_password
 
 # Docker Overrides (automatic in docker-compose)
 SHIPIT_DATABASE_HOST=postgres
-SHIPIT_REDIS_HOST=redis
+
 ```
 
 The server will start on `http://localhost:8080` with the following services:
@@ -452,7 +452,7 @@ The server automatically creates and migrates the following tables:
 ### Connection Pooling
 
 - Database connection pooling with configurable limits
-- Redis connection pooling for session storage
+
 - HTTP connection keep-alive for better performance
 
 ### Monitoring

@@ -68,15 +68,6 @@ SHIPIT_DATABASE_MAX_CONNECTIONS=25     # Connection pool size
 SHIPIT_DATABASE_MAX_IDLE_CONNECTIONS=5 # Idle connection limit
 ```
 
-### 📦 Redis Configuration
-
-```bash
-SHIPIT_REDIS_HOST=localhost            # Redis host
-SHIPIT_REDIS_PORT=6379                # Redis port
-SHIPIT_REDIS_PASSWORD=                # Redis password (optional)
-SHIPIT_REDIS_DB=0                     # Redis database number
-```
-
 ### 🔐 Authentication Settings
 
 ```bash
@@ -229,7 +220,7 @@ When using Docker Compose, the following variables are automatically overridden:
 
 ```bash
 SHIPIT_DATABASE_HOST=postgres    # Container name
-SHIPIT_REDIS_HOST=redis         # Container name
+
 ```
 
 The `docker-compose.yml` loads your `.env` file automatically and overrides networking for containers.
@@ -239,6 +230,7 @@ The `docker-compose.yml` loads your `.env` file automatically and overrides netw
 ### 🔐 Secret Management
 
 1. **Generate Strong Secrets**
+
    ```bash
    make secrets-generate  # Generates cryptographically secure secrets
    ```
@@ -249,6 +241,7 @@ The `docker-compose.yml` loads your `.env` file automatically and overrides netw
    - Rotate secrets regularly
 
 3. **Production Requirements**
+
    ```bash
    make env-validate  # Validates no CHANGE_ME values remain
    ```
@@ -279,18 +272,20 @@ SHIPIT_SECRET_DATABASE_PASSWORD=$(openssl rand -base64 32)
 ### Common Issues
 
 1. **Missing .env file**
+
    ```bash
    make env-init  # Creates from template
    ```
 
 2. **Invalid configuration**
+
    ```bash
    make env-validate  # Checks for issues
    ```
 
 3. **Docker networking issues**
    - Ensure `SHIPIT_DATABASE_HOST=postgres` in Docker
-   - Ensure `SHIPIT_REDIS_HOST=redis` in Docker
+
 
 4. **Secret validation errors**
    - Update all `CHANGE_ME` values

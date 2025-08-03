@@ -112,7 +112,7 @@ func setSecretsDefaults(v *viper.Viper) {
 	v.SetDefault("api.webhook_secret", "dev-webhook-verification-secret")
 
 	// Admin defaults
-	v.SetDefault("admin.email", "admin@localhost")
+	v.SetDefault("admin.email", "admin@shipit.local")
 	v.SetDefault("admin.password", "admin123456")
 }
 

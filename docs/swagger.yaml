@@ -18,6 +18,17 @@ definitions:
       total_tunnels:
         type: integer
     type: object
+  handlers.CountryStat:
+    properties:
+      country_code:
+        type: string
+      country_name:
+        type: string
+      percent:
+        type: number
+      requests:
+        type: integer
+    type: object
   handlers.CreateAPIKeyRequest:
     properties:
       expires_at:
@@ -75,6 +86,15 @@ definitions:
     - email
     - password
     type: object
+  handlers.PathStat:
+    properties:
+      bandwidth_bytes:
+        type: integer
+      path:
+        type: string
+      requests:
+        type: integer
+    type: object
   handlers.RefreshTokenRequest:
     properties:
       refresh_token:
@@ -97,6 +117,34 @@ definitions:
     - name
     - password
     type: object
+  handlers.TrafficAnalyticsResponse:
+    properties:
+      countries:
+        items:
+          $ref: '#/definitions/handlers.CountryStat'
+        type: array
+      generated_at:
+        type: string
+      period:
+        type: string
+      status_codes:
+        additionalProperties:
+          format: int64
+          type: integer
+        type: object
+      top_paths:
+        items:
+          $ref: '#/definitions/handlers.PathStat'
+        type: array
+      top_visitors:
+        items:
+          $ref: '#/definitions/handlers.VisitorStat'
+        type: array
+      user_agents:
+        items:
+          $ref: '#/definitions/handlers.UserAgentStat'
+        type: array
+    type: object
   handlers.TunnelAnalyticsPoint:
     properties:
       bytes_in:
@@ -110,6 +158,19 @@ definitions:
       response_time_avg:
         type: number
       timestamp:
+        type: string
+    type: object
+  handlers.TunnelAnalyticsResponse:
+    properties:
+      metrics:
+        $ref: '#/definitions/handlers.TunnelMetricsSummary'
+      period:
+        type: string
+      time_series:
+        items:
+          $ref: '#/definitions/handlers.TunnelAnalyticsPoint'
+        type: array
+      tunnel_id:
         type: string
     type: object
   handlers.TunnelListResponse:
@@ -132,6 +193,21 @@ definitions:
         type: string
       updated_at:
         type: string
+    type: object
+  handlers.TunnelMetricsSummary:
+    properties:
+      average_latency_ms:
+        type: number
+      error_rate_percent:
+        type: number
+      total_bandwidth:
+        type: string
+      total_bandwidth_bytes:
+        type: integer
+      total_requests:
+        type: integer
+      uptime_percent:
+        type: number
     type: object
   handlers.TunnelProtocol:
     enum:
@@ -165,6 +241,15 @@ definitions:
       name:
         type: string
     type: object
+  handlers.UserAgentStat:
+    properties:
+      percent:
+        type: number
+      requests:
+        type: integer
+      user_agent:
+        type: string
+    type: object
   handlers.ValidateTokenRequest:
     properties:
       token:
@@ -183,6 +268,17 @@ definitions:
         type: string
       valid:
         type: boolean
+    type: object
+  handlers.VisitorStat:
+    properties:
+      bandwidth_bytes:
+        type: integer
+      country:
+        type: string
+      ip_address:
+        type: string
+      requests:
+        type: integer
     type: object
 host: localhost:8080
 info:
@@ -229,6 +325,79 @@ paths:
       security:
       - BearerAuth: []
       summary: Get analytics overview
+      tags:
+      - analytics
+  /analytics/traffic:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed traffic analytics including top visitors, paths, status
+        codes, and geographic data
+      parameters:
+      - default: 24h
+        description: Time period for analytics
+        in: query
+        name: period
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Traffic analytics
+          schema:
+            $ref: '#/definitions/handlers.TrafficAnalyticsResponse'
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get traffic analytics
+      tags:
+      - analytics
+  /analytics/tunnels/{tunnel_id}/stats:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed analytics for a specific tunnel including metrics
+        and time series data
+      parameters:
+      - description: Tunnel ID
+        in: path
+        name: tunnel_id
+        required: true
+        type: string
+      - default: 24h
+        description: Time period for analytics
+        in: query
+        name: period
+        type: string
+      - default: requests,bandwidth,latency
+        description: Metrics to include
+        in: query
+        name: metrics
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Tunnel analytics
+          schema:
+            $ref: '#/definitions/handlers.TunnelAnalyticsResponse'
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Tunnel not found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get tunnel analytics
       tags:
       - analytics
   /auth/token/info:
@@ -296,7 +465,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: Get a list of all tunnels for the authenticated user
+      description: Get a list of tunnels belonging to the authenticated user
       parameters:
       - description: Filter by tunnel status (active, inactive, terminated)
         in: query
@@ -371,7 +540,8 @@ paths:
     delete:
       consumes:
       - application/json
-      description: Delete a specific tunnel
+      description: Delete a specific tunnel. This will terminate the tunnel and close
+        all connections.
       parameters:
       - description: Tunnel ID
         in: path
